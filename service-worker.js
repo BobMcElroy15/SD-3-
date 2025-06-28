@@ -1,26 +1,18 @@
 // service-worker.js
 
-// ↑↑ bump this on every update ↑↑
 const CACHE_VERSION = 4;
 const CACHE_NAME    = `sd3ps-cache-v${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
-  '/',                // root → index.html
-  '/index.html',
-  '/manifest.json',
-  '/qr-code.png',
-  // your local icons
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  // Leaflet assets
+  '/', '/index.html', '/manifest.json', '/qr-code.png',
+  '/icons/icon-192.png', '/icons/icon-512.png',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  // Firebase compat SDKs
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js'
 ];
 
-// 1) Install – precache the app shell and SDKs
+// Install: cache app shell + SDKs
 self.addEventListener('install', evt => {
   evt.waitUntil(
     caches.open(CACHE_NAME)
@@ -29,29 +21,29 @@ self.addEventListener('install', evt => {
   );
 });
 
-// 2) Activate – delete any old caches
+// Activate: clean up old caches
 self.addEventListener('activate', evt => {
   evt.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
+        keys.filter(k => k !== CACHE_NAME)
+            .map(k => caches.delete(k))
       )
     ).then(() => self.clients.claim())
   );
 });
 
-// 3) Fetch – Network‐First for HTML navigations, Cache‐First for everything else
+// Fetch: network-first for navigation, cache-first otherwise
 self.addEventListener('fetch', evt => {
   const req = evt.request;
-
-  // a) HTML pages (navigations) – Network first, fallback to cache
-  if (req.mode === 'navigate' ||
-     (req.method === 'GET' && req.headers.get('accept').includes('text/html'))) {
+  if (req.mode === 'navigate'
+      || (req.method === 'GET'
+          && req.headers.get('accept').includes('text/html'))) {
+    // HTML pages → network first
     evt.respondWith(
       fetch(req)
         .then(res => {
-          // update our cache for offline
+          // update cache
           const copy = res.clone();
           caches.open(CACHE_NAME).then(cache => cache.put('/', copy));
           return res;
@@ -60,15 +52,14 @@ self.addEventListener('fetch', evt => {
     );
     return;
   }
-
-  // b) All other requests – Cache first, then network & cache
+  // Other assets → cache-first
   evt.respondWith(
-    caches.match(req).then(cached => {
-      return cached || fetch(req).then(res => {
+    caches.match(req).then(cached =>
+      cached || fetch(req).then(res => {
         const copy = res.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
         return res;
-      });
-    })
+      })
+    )
   );
 });
