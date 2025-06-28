@@ -26,19 +26,9 @@
       z-index:1000; background:white; padding:6px; border-radius:6px;
       font-size:14px;
     }
-    #installBtn {
-      position:absolute; top:110px; left:5%; z-index:1000;
-      background:#0066cc; color:white; padding:8px; border:none;
-      border-radius:4px; font-size:14px; cursor:pointer;
-    }
-    @media(min-width:600px){
-      #title { left:50px; width:auto; max-width:400px; }
-      #stationSelect { left:50px; width:auto; max-width:300px; }
-      #installBtn { left:50px; }
-    }
     /* Share overlay */
     #shareBtn {
-      position:absolute; top:150px; left:5%; z-index:1000;
+      position:absolute; top:110px; left:5%; z-index:1000;
       background:#0066cc; color:#fff; padding:8px 12px; border:none;
       border-radius:4px; font-size:14px; cursor:pointer;
     }
@@ -50,9 +40,7 @@
     #shareOverlayContent {
       background:#fff; padding:20px; border-radius:8px; text-align:center;
     }
-    #shareOverlayContent img {
-      max-width:80vw; height:auto;
-    }
+    #shareOverlayContent img { max-width:80vw; height:auto; }
     #closeShare {
       margin-top:10px; background:#333; color:#fff; border:none;
       padding:8px 12px; border-radius:4px; cursor:pointer;
@@ -61,16 +49,13 @@
 </head>
 <body>
   <div id="title">Sewer District 3 Pump Station Map</div>
-  <select id="stationSelect">
-    <option value="">Select Pump Station</option>
-  </select>
-  <button id="installBtn" style="display:none">Install App</button>
+  <select id="stationSelect"><option value="">Select Pump Station</option></select>
   <button id="shareBtn">Share</button>
 
   <div id="shareOverlay">
     <div id="shareOverlayContent">
       <p>Scan to share:</p>
-      <img src="qr-code.png" alt="Share via QR code"><br>
+      <img src="qr-code.png" alt="QR code"><br>
       <button id="closeShare">Close</button>
     </div>
   </div>
@@ -99,27 +84,6 @@
   </script>
 
   <script>
-    // PWA install prompt
-    let deferredPrompt;
-    const installBtn = document.getElementById('installBtn');
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault();
-      deferredPrompt = e;
-      installBtn.style.display = 'block';
-    });
-    installBtn.addEventListener('click', () => {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(() => deferredPrompt = null);
-      installBtn.style.display = 'none';
-    });
-
-    // Conditionally register SW (skip in standalone PWA so we always fetch fresh)
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-                      || window.navigator.standalone === true;
-    if (!isStandalone && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(console.error);
-    }
-
     // Pump station data
     const stations = [
       {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
@@ -174,14 +138,14 @@
       select.appendChild(opt);
     });
 
-    // Zoom & open on select
+    // Zoom & open popup on dropdown select
     select.addEventListener('change', () => {
       const i = select.value;
       map.setView([stations[i].lat, stations[i].lon], 17);
       markers[i].openPopup();
     });
 
-    // Handle popup logic
+    // Handle popup logic (load & display note each open)
     map.on('popupopen', e => {
       const c = e.popup._contentNode;
       const idx = c.querySelector('.note-btn').dataset.idx;
@@ -192,7 +156,7 @@
       const del = c.querySelector('.delete-note-btn');
       const undo = c.querySelector('.undo-note-btn');
 
-      // Load note on open
+      // Load existing note
       docRef.get().then(doc => {
         disp.textContent = doc.exists ? doc.data().text : '';
       });
@@ -204,7 +168,10 @@
           const cur = doc.exists ? doc.data().text : '';
           const note = prompt(`Note for ${code}:`, cur);
           if (note !== null) {
-            docRef.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
+            docRef.set({
+              text: note,
+              updated: firebase.firestore.FieldValue.serverTimestamp()
+            });
             disp.textContent = note;
             undo.style.display = 'none';
           }
@@ -228,12 +195,14 @@
         ev.preventDefault();
         const prev = tempDeleted[code];
         if (prev !== undefined) {
-          docRef.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() })
-            .then(() => {
-              disp.textContent = prev;
-              undo.style.display = 'none';
-              delete tempDeleted[code];
-            });
+          docRef.set({
+            text: prev,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(() => {
+            disp.textContent = prev;
+            undo.style.display = 'none';
+            delete tempDeleted[code];
+          });
         }
       };
     });
