@@ -64,11 +64,9 @@
 <body>
 
   <div id="title">Sewer District 3 Pump Station Map</div>
-
   <select id="stationSelect">
     <option value="">Select Pump Station</option>
   </select>
-
   <button id="installBtn">Install App</button>
   <button id="shareBtn">Share</button>
 
@@ -118,10 +116,11 @@
 
     // Register service worker
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(console.error);
+      navigator.serviceWorker.register('service-worker.js')
+        .catch(console.error);
     }
 
-    // Pump stations data
+    // Pump station data
     const stations = [
       {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -142,13 +141,13 @@
       {"code":"PS#317-2","lat":40.7868774,"lon":-73.406908,"address":"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Initialize the map
+    // Initialize map
     const map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Build dropdown, markers, and note logic
+    // Build dropdown, markers, and notes
     const select = document.getElementById('stationSelect');
     const markers = [];
     const tempDeleted = {};
@@ -174,28 +173,24 @@
       select.appendChild(opt);
     });
 
-    // Zoom & open popup when selecting from dropdown
     select.addEventListener('change', () => {
       const i = select.value;
       map.setView([stations[i].lat, stations[i].lon], 17);
       markers[i].openPopup();
     });
 
-    // Handle note buttons inside popups
     map.on('popupopen', e => {
-      const c   = e.popup._contentNode;
-      const idx = c.querySelector('.note-btn').dataset.idx;
-      const code= stations[idx].code;
-      const doc = db.collection('notes').doc(code);
-      const disp= c.querySelector(`#note-display-${idx}`);
-      const add = c.querySelector('.note-btn');
-      const del = c.querySelector('.delete-note-btn');
-      const undo= c.querySelector('.undo-note-btn');
+      const c    = e.popup._contentNode;
+      const idx  = c.querySelector('.note-btn').dataset.idx;
+      const code = stations[idx].code;
+      const doc  = db.collection('notes').doc(code);
+      const disp = c.querySelector(`#note-display-${idx}`);
+      const add  = c.querySelector('.note-btn');
+      const del  = c.querySelector('.delete-note-btn');
+      const undo = c.querySelector('.undo-note-btn');
 
-      // Load existing note
       doc.get().then(d => disp.textContent = d.exists ? d.data().text : '');
 
-      // Add/Edit
       add.onclick = ev => {
         ev.preventDefault();
         doc.get().then(d => {
@@ -209,7 +204,6 @@
         });
       };
 
-      // Delete
       del.onclick = ev => {
         ev.preventDefault();
         doc.get().then(d => {
@@ -221,7 +215,6 @@
         });
       };
 
-      // Undo
       undo.onclick = ev => {
         ev.preventDefault();
         const prev = tempDeleted[code];
