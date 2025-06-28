@@ -5,7 +5,7 @@
   <title>Sewer District 3 Pump Station Map</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
 
-  <!-- Force‐unregister any old SW so we don’t keep serving stale HTML -->
+  <!-- Auto-unregister old SW to avoid stale HTML -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations()
@@ -26,7 +26,7 @@
     body { margin:0; padding:0; }
     #map { height:100vh; }
 
-    /* Title, dropdown, buttons */
+    /* Title + dropdown */
     #title {
       position:absolute; top:10px; left:5%; width:90%; max-width:400px;
       z-index:1000; background:white; padding:6px; border-radius:6px;
@@ -37,19 +37,22 @@
       z-index:1000; background:white; padding:6px; border-radius:6px;
       font-size:14px;
     }
-    #installBtn, #shareBtn {
+
+    /* Buttons */
+    #shareBtn, #installBtn {
       position:absolute; left:5%; z-index:1000;
       background:#0066cc; color:#fff; padding:8px 12px; border:none;
       border-radius:4px; font-size:14px; cursor:pointer;
     }
-    #installBtn { top:110px; display:none; }
-    #shareBtn   { top:150px; }
+    /* share on top, install underneath */
+    #shareBtn   { top:110px; }
+    #installBtn { top:150px; display:none; }
 
     @media(min-width:600px){
       #title { left:50px; }
       #stationSelect { left:50px; }
+      #shareBtn   { left:50px; }
       #installBtn { left:50px; }
-      #shareBtn   { left:50px; top:110px; }
     }
 
     /* Share overlay */
@@ -61,9 +64,7 @@
     #shareOverlayContent {
       background:white; padding:20px; border-radius:8px; text-align:center;
     }
-    #shareOverlayContent img {
-      max-width:80vw; height:auto;
-    }
+    #shareOverlayContent img { max-width:80vw; height:auto; }
     #closeShare {
       margin-top:10px; padding:8px 12px; border:none;
       background:#333; color:white; border-radius:4px; cursor:pointer;
@@ -77,8 +78,9 @@
     <option value="">Select Pump Station</option>
   </select>
 
-  <button id="installBtn">Install App</button>
+  <!-- Buttons in correct order -->
   <button id="shareBtn">Share</button>
+  <button id="installBtn">Install App</button>
 
   <div id="shareOverlay">
     <div id="shareOverlayContent">
@@ -97,7 +99,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <script>
-    // Initialize Firebase
+    // Firebase init
     firebase.initializeApp({
       apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain: "sd3ps-map.firebaseapp.com",
@@ -124,46 +126,46 @@
       deferredPrompt = null;
     });
 
-    // Register the fresh service worker
+    // Register fresh SW
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js')
         .catch(console.error);
     }
 
-    // Pump station data
+    // Station data
     const stations = [
-      {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
-      {"code":"PS#302","lat":40.704264,"lon":-73.2548192,"address":"33 Girard Ave, Brightwaters, NY 11718"},
-      {"code":"PS#303","lat":40.7058464,"lon":-73.2509559,"address":"1 Shore Road East, Brightwaters, NY 11718"},
-      {"code":"PS#304","lat":40.7138133,"lon":-73.2467338,"address":"7 Prospect Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#305","lat":40.7169715,"lon":-73.2424563,"address":"89 Maple Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#306","lat":40.7195939,"lon":-73.2375154,"address":"83 South Montgomery Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#307","lat":40.7145541,"lon":-73.2211747,"address":"600 Ocean Avenue, Islip, NY 11751"},
-      {"code":"PS#308","lat":40.7143538,"lon":-73.1967512,"address":"57 The Helm, East Islip, NY 11730"},
-      {"code":"PS#309","lat":40.6618005,"lon":-73.4190788,"address":"219 Richmond Avenue, Amityville, NY 11701"},
-      {"code":"PS#310","lat":40.6583148,"lon":-73.4003024,"address":"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
-      {"code":"PS#311","lat":40.7751554,"lon":-73.2063197,"address":"71 Beech Street, Central Islip, NY 11722"},
-      {"code":"PS#312","lat":40.7872918,"lon":-73.2842493,"address":"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
-      {"code":"PS#313","lat":40.7786667,"lon":-73.1933449,"address":"1 Fairlawn Drive, Central Islip, NY 11722"},
-      {"code":"PS#314","lat":40.751412,"lon":-73.360911,"address":"2 Irving Avenue, Wyandanch, NY 11798"},
-      {"code":"PS#317-1","lat":40.8203973,"lon":-73.4078002,"address":"New York Avenue, South Huntington, NY 11746"},
-      {"code":"PS#317-2","lat":40.7868774,"lon":-73.406908,"address":"270 McGovern Drive, Melville, NY 11747"}
+      {code:"PS#300 AWXIA",lat:40.7227675,lon:-73.2307527,address:"50 South Saxon Avenue, Bay Shore, NY 11706"},
+      {code:"PS#301",lat:40.6930405,lon:-73.2790417,address:"9 Oak Neck Lane, West Islip, NY 11795"},
+      {code:"PS#302",lat:40.704264,lon:-73.2548192,address:"33 Girard Ave, Brightwaters, NY 11718"},
+      {code:"PS#303",lat:40.7058464,lon:-73.2509559,address:"1 Shore Road East, Brightwaters, NY 11718"},
+      {code:"PS#304",lat:40.7138133,lon:-73.2467338,address:"7 Prospect Avenue, Bay Shore, NY 11706"},
+      {code:"PS#305",lat:40.7169715,lon:-73.2424563,address:"89 Maple Avenue, Bay Shore, NY 11706"},
+      {code:"PS#306",lat:40.7195939,lon:-73.2375154,address:"83 South Montgomery Avenue, Bay Shore, NY 11706"},
+      {code:"PS#307",lat:40.7145541,lon:-73.2211747,address:"600 Ocean Avenue, Islip, NY 11751"},
+      {code:"PS#308",lat:40.7143538,lon:-73.1967512,address:"57 The Helm, East Islip, NY 11730"},
+      {code:"PS#309",lat:40.6618005,lon:-73.4190788,address:"219 Richmond Avenue, Amityville, NY 11701"},
+      {code:"PS#310",lat:40.6583148,lon:-73.4003024,address:"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
+      {code:"PS#311",lat:40.7751554,lon:-73.2063197,address:"71 Beech Street, Central Islip, NY 11722"},
+      {code:"PS#312",lat:40.7872918,lon:-73.2842493,address:"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
+      {code:"PS#313",lat:40.7786667,lon:-73.1933449,address:"1 Fairlawn Drive, Central Islip, NY 11722"},
+      {code:"PS#314",lat:40.751412,lon:-73.360911,address:"2 Irving Avenue, Wyandanch, NY 11798"},
+      {code:"PS#317-1",lat:40.8203973,lon:-73.4078002,address:"New York Avenue, South Huntington, NY 11746"},
+      {code:"PS#317-2",lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Initialize map
+    // Init map
     const map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Populate dropdown & markers
-    const select = document.getElementById('stationSelect');
-    const markers = [];
-    const tempDeleted = {};
+    // Dropdown, markers & notes
+    const select = document.getElementById('stationSelect'),
+          markers = [],
+          tempDeleted = {};
 
     stations.forEach((st, idx) => {
-      const html = `
+      const popup = `
         <strong>${st.code}</strong><br>
         ${st.address}<br>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
@@ -173,9 +175,9 @@
         <a href="#" class="delete-note-btn" data-idx="${idx}">Delete Note</a>
         <span> | </span>
         <a href="#" class="undo-note-btn" data-idx="${idx}" style="display:none">Undo Delete</a>
-        <div id="note-display-${idx}" style="margin:8px 0 0;font-style:italic;color:#555;"></div>
+        <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;"></div>
       `;
-      markers[idx] = L.marker([st.lat, st.lon]).addTo(map).bindPopup(html);
+      markers[idx] = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popup);
 
       const opt = document.createElement('option');
       opt.value = idx;
@@ -190,14 +192,14 @@
     });
 
     map.on('popupopen', e => {
-      const c   = e.popup._contentNode;
-      const idx = c.querySelector('.note-btn').dataset.idx;
-      const code= stations[idx].code;
-      const doc = db.collection('notes').doc(code);
-      const disp= c.querySelector(`#note-display-${idx}`);
-      const add = c.querySelector('.note-btn');
-      const del = c.querySelector('.delete-note-btn');
-      const undo= c.querySelector('.undo-note-btn');
+      const c   = e.popup._contentNode,
+            idx = c.querySelector('.note-btn').dataset.idx,
+            code= stations[idx].code,
+            doc = db.collection('notes').doc(code),
+            disp= c.querySelector(`#note-display-${idx}`),
+            add = c.querySelector('.note-btn'),
+            del = c.querySelector('.delete-note-btn'),
+            undo= c.querySelector('.undo-note-btn');
 
       doc.get().then(d => disp.textContent = d.exists ? d.data().text : '');
 
@@ -239,7 +241,7 @@
       };
     });
 
-    // Share overlay toggles
+    // Share overlay
     document.getElementById('shareBtn').onclick = () => {
       document.getElementById('shareOverlay').style.display = 'flex';
     };
