@@ -46,8 +46,8 @@
     /* Share overlay */
     #shareOverlay {
       position:fixed; top:0; left:0; width:100%; height:100%;
-      background:rgba(0,0,0,0.7); display:flex; align-items:center;
-      justify-content:center; z-index:2000; display:none;
+      background:rgba(0,0,0,0.7); display:none;
+      align-items:center; justify-content:center; z-index:2000;
     }
     #shareOverlayContent {
       background:white; padding:20px; border-radius:8px; text-align:center;
@@ -99,7 +99,7 @@
     });
     const db = firebase.firestore();
 
-    // Handle PWA install prompt
+    // PWA Install prompt
     let deferredPrompt;
     const installBtn = document.getElementById('installBtn');
     window.addEventListener('beforeinstallprompt', e => {
@@ -125,117 +125,4 @@
       {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
       {"code":"PS#302","lat":40.704264,"lon":-73.2548192,"address":"33 Girard Ave, Brightwaters, NY 11718"},
-      {"code":"PS#303","lat":40.7058464,"lon":-73.2509559,"address":"1 Shore Road East, Brightwaters, NY 11718"},
-      {"code":"PS#304","lat":40.7138133,"lon":-73.2467338,"address":"7 Prospect Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#305","lat":40.7169715,"lon":-73.2424563,"address":"89 Maple Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#306","lat":40.7195939,"lon":-73.2375154,"address":"83 South Montgomery Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#307","lat":40.7145541,"lon":-73.2211747,"address":"600 Ocean Avenue, Islip, NY 11751"},
-      {"code":"PS#308","lat":40.7143538,"lon":-73.1967512,"address":"57 The Helm, East Islip, NY 11730"},
-      {"code":"PS#309","lat":40.6618005,"lon":-73.4190788,"address":"219 Richmond Avenue, Amityville, NY 11701"},
-      {"code":"PS#310","lat":40.6583148,"lon":-73.4003024,"address":"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
-      {"code":"PS#311","lat":40.7751554,"lon":-73.2063197,"address":"71 Beech Street, Central Islip, NY 11722"},
-      {"code":"PS#312","lat":40.7872918,"lon":-73.2842493,"address":"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
-      {"code":"PS#313","lat":40.7786667,"lon":-73.1933449,"address":"1 Fairlawn Drive, Central Islip, NY 11722"},
-      {"code":"PS#314","lat":40.751412,"lon":-73.360911,"address":"2 Irving Avenue, Wyandanch, NY 11798"},
-      {"code":"PS#317-1","lat":40.8203973,"lon":-73.4078002,"address":"New York Avenue, South Huntington, NY 11746"},
-      {"code":"PS#317-2","lat":40.7868774,"lon":-73.406908,"address":"270 McGovern Drive, Melville, NY 11747"}
-    ];
-
-    // Initialize map
-    const map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      attribution:'© OpenStreetMap contributors'
-    }).addTo(map);
-
-    const select = document.getElementById('stationSelect'),
-          markers = [],
-          tempDeleted = {};
-
-    // Build markers & dropdown
-    stations.forEach((st, idx) => {
-      const popup = `
-        <strong>${st.code}</strong><br>
-        ${st.address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
-        <span> | </span>
-        <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
-        <span> | </span>
-        <a href="#" class="delete-note-btn" data-idx="${idx}">Delete Note</a>
-        <span> | </span>
-        <a href="#" class="undo-note-btn" data-idx="${idx}" style="display:none">Undo Delete</a>
-        <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;"></div>
-      `;
-      markers[idx] = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popup);
-
-      const opt = document.createElement('option');
-      opt.value = idx;
-      opt.text  = `${st.code} – ${st.address}`;
-      select.appendChild(opt);
-    });
-
-    // Zoom & open popup on select
-    select.addEventListener('change', () => {
-      const i = select.value;
-      map.setView([stations[i].lat, stations[i].lon], 17);
-      markers[i].openPopup();
-    });
-
-    // Popup note logic
-    map.on('popupopen', e => {
-      const c   = e.popup._contentNode;
-      const idx = c.querySelector('.note-btn').dataset.idx;
-      const code= stations[idx].code;
-      const doc = db.collection('notes').doc(code);
-      const disp= c.querySelector(`#note-display-${idx}`);
-      const add = c.querySelector('.note-btn');
-      const del = c.querySelector('.delete-note-btn');
-      const undo= c.querySelector('.undo-note-btn');
-
-      doc.get().then(d=>disp.textContent=d.exists?d.data().text:'');
-
-      add.onclick = ev => {
-        ev.preventDefault();
-        doc.get().then(d => {
-          const cur = d.exists?d.data().text:'';
-          const note = prompt(`Note for ${code}:`, cur);
-          if (note!==null) {
-            doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
-            disp.textContent = note;
-            undo.style.display = 'none';
-          }
-        });
-      };
-      del.onclick = ev => {
-        ev.preventDefault();
-        doc.get().then(d=>{
-          tempDeleted[code]=d.exists?d.data().text:'';
-          return doc.delete();
-        }).then(()=>{
-          disp.textContent='';
-          undo.style.display='inline';
-        });
-      };
-      undo.onclick= ev => {
-        ev.preventDefault();
-        const prev=tempDeleted[code];
-        if(prev!==undefined){
-          doc.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() })
-            .then(()=>{
-              disp.textContent=prev;
-              undo.style.display='none';
-              delete tempDeleted[code];
-            });
-        }
-      };
-    });
-
-    // Share overlay
-    document.getElementById('shareBtn').onclick = () => {
-      document.getElementById('shareOverlay').style.display = 'flex';
-    };
-    document.getElementById('closeShare').onclick = () => {
-      document.getElementById('shareOverlay').style.display = 'none';
-    };
-  </script>
-</body>
-</html>
+      {"code":"PS#303","l
