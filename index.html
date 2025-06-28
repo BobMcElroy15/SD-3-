@@ -201,4 +201,12 @@
   </script>
 
   <script>
-    // Share overla
+    // Share overlay behavior
+    const shareBtn = document.getElementById('shareBtn');
+    const overlay  = document.getElementById('shareOverlay');
+    const closeBtn = document.getElementById('closeShare');
+    shareBtn.addEventListener('click', () => overlay.style.display = 'flex');
+    closeBtn.addEventListener('click', () => overlay.style.display = 'none');
+  </script>
+</body>
+</html>
