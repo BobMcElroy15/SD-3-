@@ -6,7 +6,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0066cc">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     body { margin:0; padding:0; }
     #map { height:100vh; }
@@ -71,7 +72,24 @@
 
   <div id="map"></div>
 
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script>
+    // TODO: Replace with your own Firebase config
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      // ...other settings...
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+  </script>
+
   <script>
     // PWA install prompt
     let deferredPrompt;
@@ -87,12 +105,12 @@
       deferredPrompt.userChoice.then(() => deferredPrompt = null);
     });
 
-    // Service Worker
+    // Register Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js');
     }
 
-    // Station Data
+    // Pump station data
     const stations = [
       {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -113,95 +131,118 @@
       {"code":"PS#317-2","lat":40.7868774,"lon":-73.406908,"address":"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Initialize Map
+    // Initialize map
     const map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      { attribution: '© OpenStreetMap contributors' }
-    ).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
-    // Populate Dropdown & Markers
+    // Utility for Undo storage
+    const tempDeleted = {};
+
+    // Populate dropdown & markers, wiring Firestore notes
     const select = document.getElementById('stationSelect');
     const markers = [];
 
     stations.forEach((st, idx) => {
+      // Popup with Navigate, Add/Edit, Delete, Undo links
       const popupHtml = `
         <strong>${st.code}</strong><br>
         ${st.address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">
-          Navigate
-        </a>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}"
+           target="_blank">Navigate</a>
         <span> | </span>
         <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
         <span> | </span>
         <a href="#" class="delete-note-btn" data-idx="${idx}">Delete Note</a>
-        <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;">
-          ${localStorage.getItem('note-' + st.code) || ''}
-        </div>
-        <div id="undo-display-${idx}" style="margin-top:6px;color:#0066cc;"></div>
+        <span> | </span>
+        <a href="#" class="undo-note-btn" data-idx="${idx}" style="display:none">Undo Delete</a>
+        <div id="note-display-${idx}"
+             style="margin-top:6px;font-style:italic;color:#555;">Loading…</div>
       `;
-      const m = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popupHtml);
-      markers.push(m);
+      const marker = L.marker([st.lat, st.lon]).addTo(map)
+        .bindPopup(popupHtml);
+      markers.push(marker);
 
+      // Dropdown
       const opt = document.createElement('option');
       opt.value = idx;
       opt.text  = `${st.code} – ${st.address}`;
       select.appendChild(opt);
+
+      // Firestore real-time listener
+      const docRef = db.collection('notes').doc(st.code);
+      docRef.onSnapshot(doc => {
+        const disp = document.getElementById(`note-display-${idx}`);
+        if (disp) {
+          disp.textContent = doc.exists ? doc.data().text : '';
+          // hide undo if a note exists again
+          const undoLink = document.querySelector(`.undo-note-btn[data-idx="${idx}"]`);
+          if (undoLink) undoLink.style.display = 'none';
+        }
+      });
     });
 
-    // Zoom & open popup on selection
+    // Zoom & open popup on dropdown select
     select.addEventListener('change', () => {
       const i = select.value;
       map.setView([stations[i].lat, stations[i].lon], 17);
       markers[i].openPopup();
     });
 
-    // Note Handlers with Undo
+    // Popup actions: Add/Edit, Delete, Undo
     map.on('popupopen', e => {
-      const content = e.popup._contentNode;
-      const addBtn    = content.querySelector('.note-btn');
-      const delBtn    = content.querySelector('.delete-note-btn');
-      const idx       = addBtn.dataset.idx;
-      const key       = 'note-' + stations[idx].code;
-      let lastDeleted = null;
+      const node   = e.popup._contentNode;
+      const idx    = node.querySelector('.note-btn').dataset.idx;
+      const st     = stations[idx];
+      const key    = st.code;
+      const docRef = db.collection('notes').doc(key);
+      const deleteBtn = node.querySelector('.delete-note-btn');
+      const addBtn    = node.querySelector('.note-btn');
+      const undoBtn   = node.querySelector('.undo-note-btn');
+      const disp      = node.querySelector(`#note-display-${idx}`);
 
       // Add/Edit Note
       addBtn.addEventListener('click', ev => {
         ev.preventDefault();
-        const existing = localStorage.getItem(key) || '';
-        const note = prompt(`Enter note for ${stations[idx].code}:`, existing);
-        if (note !== null) {
-          localStorage.setItem(key, note);
-          content.querySelector(`#note-display-${idx}`).textContent = note;
-          content.querySelector(`#undo-display-${idx}`).textContent = '';
-        }
+        docRef.get().then(doc => {
+          const current = doc.exists ? doc.data().text : '';
+          const note = prompt(`Note for ${key}:`, current);
+          if (note !== null) {
+            docRef.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
+          }
+        });
       });
 
       // Delete Note
-      delBtn.addEventListener('click', ev => {
+      deleteBtn.addEventListener('click', ev => {
         ev.preventDefault();
-        lastDeleted = localStorage.getItem(key) || '';
-        localStorage.removeItem(key);
-        content.querySelector(`#note-display-${idx}`).textContent = '';
-
-        // Show Undo link
-        const undoDiv = content.querySelector(`#undo-display-${idx}`);
-        undoDiv.innerHTML = `<a href="#" class="undo-btn" data-idx="${idx}">Undo delete</a>`;
-
-        // Hook up Undo
-        undoDiv.querySelector('.undo-btn').addEventListener('click', ue => {
-          ue.preventDefault();
-          if (lastDeleted !== null) {
-            localStorage.setItem(key, lastDeleted);
-            content.querySelector(`#note-display-${idx}`).textContent = lastDeleted;
-          }
-          undoDiv.textContent = '';
+        docRef.get().then(doc => {
+          tempDeleted[key] = doc.exists ? doc.data().text : '';
+          return docRef.delete();
+        }).then(() => {
+          // show undo link
+          undoBtn.style.display = 'inline';
         });
+      });
+
+      // Undo Delete
+      undoBtn.addEventListener('click', ev => {
+        ev.preventDefault();
+        const prev = tempDeleted[key];
+        if (prev !== undefined) {
+          docRef.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() })
+            .then(() => {
+              undoBtn.style.display = 'none';
+              delete tempDeleted[key];
+            });
+        }
       });
     });
   </script>
 
   <script>
-    // Share overlay behavior
+    // Share overlay logic
     const shareBtn = document.getElementById('shareBtn');
     const overlay  = document.getElementById('shareOverlay');
     const closeBtn = document.getElementById('closeShare');
