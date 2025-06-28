@@ -6,10 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0066cc">
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     body { margin:0; padding:0; }
     #map { height:100vh; }
@@ -33,8 +30,7 @@
       #stationSelect { left:50px; width:auto; max-width:300px; }
       #installBtn { left:50px; }
     }
-
-    /* — Share overlay — */
+    /* Share overlay */
     #shareBtn {
       position:absolute; top:150px; left:5%; z-index:1000;
       background:#0066cc; color:#fff; padding:8px 12px; border:none;
@@ -52,3 +48,157 @@
       max-width:80vw; height:auto;
     }
     #closeShare {
+      margin-top:10px; background:#333; color:#fff; border:none;
+      padding:8px 12px; border-radius:4px; cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="title">Sewer District 3 Pump Station Map</div>
+  <select id="stationSelect">
+    <option value="">Select Pump Station</option>
+  </select>
+  <button id="installBtn" style="display:none">Install App</button>
+  <button id="shareBtn">Share</button>
+
+  <div id="shareOverlay" style="display:none">
+    <div id="shareOverlayContent">
+      <p>Scan to share:</p>
+      <img src="qr-code.png" alt="Share via QR code"><br>
+      <button id="closeShare">Close</button>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // PWA install prompt
+    let deferredPrompt;
+    const installBtn = document.getElementById('installBtn');
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'block';
+    });
+    installBtn.addEventListener('click', () => {
+      installBtn.style.display = 'none';
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => deferredPrompt = null);
+    });
+
+    // Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+
+    // Station Data
+    const stations = [
+      {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
+      {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
+      {"code":"PS#302","lat":40.704264,"lon":-73.2548192,"address":"33 Girard Ave, Brightwaters, NY 11718"},
+      {"code":"PS#303","lat":40.7058464,"lon":-73.2509559,"address":"1 Shore Road East, Brightwaters, NY 11718"},
+      {"code":"PS#304","lat":40.7138133,"lon":-73.2467338,"address":"7 Prospect Avenue, Bay Shore, NY 11706"},
+      {"code":"PS#305","lat":40.7169715,"lon":-73.2424563,"address":"89 Maple Avenue, Bay Shore, NY 11706"},
+      {"code":"PS#306","lat":40.7195939,"lon":-73.2375154,"address":"83 South Montgomery Avenue, Bay Shore, NY 11706"},
+      {"code":"PS#307","lat":40.7145541,"lon":-73.2211747,"address":"600 Ocean Avenue, Islip, NY 11751"},
+      {"code":"PS#308","lat":40.7143538,"lon":-73.1967512,"address":"57 The Helm, East Islip, NY 11730"},
+      {"code":"PS#309","lat":40.6618005,"lon":-73.4190788,"address":"219 Richmond Avenue, Amityville, NY 11701"},
+      {"code":"PS#310","lat":40.6583148,"lon":-73.4003024,"address":"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
+      {"code":"PS#311","lat":40.7751554,"lon":-73.2063197,"address":"71 Beech Street, Central Islip, NY 11722"},
+      {"code":"PS#312","lat":40.7872918,"lon":-73.2842493,"address":"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
+      {"code":"PS#313","lat":40.7786667,"lon":-73.1933449,"address":"1 Fairlawn Drive, Central Islip, NY 11722"},
+      {"code":"PS#314","lat":40.751412,"lon":-73.360911,"address":"2 Irving Avenue, Wyandanch, NY 11798"},
+      {"code":"PS#317-1","lat":40.8203973,"lon":-73.4078002,"address":"New York Avenue, South Huntington, NY 11746"},
+      {"code":"PS#317-2","lat":40.7868774,"lon":-73.406908,"address":"270 McGovern Drive, Melville, NY 11747"}
+    ];
+
+    // Initialize Map
+    const map = L.map('map').setView([40.730889, -73.284654], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { attribution: '© OpenStreetMap contributors' }
+    ).addTo(map);
+
+    // Populate Dropdown & Markers
+    const select = document.getElementById('stationSelect');
+    const markers = [];
+
+    stations.forEach((st, idx) => {
+      const popupHtml = `
+        <strong>${st.code}</strong><br>
+        ${st.address}<br>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">
+          Navigate
+        </a>
+        <span> | </span>
+        <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
+        <span> | </span>
+        <a href="#" class="delete-note-btn" data-idx="${idx}">Delete Note</a>
+        <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;">
+          ${localStorage.getItem('note-' + st.code) || ''}
+        </div>
+        <div id="undo-display-${idx}" style="margin-top:6px;color:#0066cc;"></div>
+      `;
+      const m = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popupHtml);
+      markers.push(m);
+
+      const opt = document.createElement('option');
+      opt.value = idx;
+      opt.text  = `${st.code} – ${st.address}`;
+      select.appendChild(opt);
+    });
+
+    // Zoom & open popup on selection
+    select.addEventListener('change', () => {
+      const i = select.value;
+      map.setView([stations[i].lat, stations[i].lon], 17);
+      markers[i].openPopup();
+    });
+
+    // Note Handlers with Undo
+    map.on('popupopen', e => {
+      const content = e.popup._contentNode;
+      const addBtn    = content.querySelector('.note-btn');
+      const delBtn    = content.querySelector('.delete-note-btn');
+      const idx       = addBtn.dataset.idx;
+      const key       = 'note-' + stations[idx].code;
+      let lastDeleted = null;
+
+      // Add/Edit Note
+      addBtn.addEventListener('click', ev => {
+        ev.preventDefault();
+        const existing = localStorage.getItem(key) || '';
+        const note = prompt(`Enter note for ${stations[idx].code}:`, existing);
+        if (note !== null) {
+          localStorage.setItem(key, note);
+          content.querySelector(`#note-display-${idx}`).textContent = note;
+          content.querySelector(`#undo-display-${idx}`).textContent = '';
+        }
+      });
+
+      // Delete Note
+      delBtn.addEventListener('click', ev => {
+        ev.preventDefault();
+        lastDeleted = localStorage.getItem(key) || '';
+        localStorage.removeItem(key);
+        content.querySelector(`#note-display-${idx}`).textContent = '';
+
+        // Show Undo link
+        const undoDiv = content.querySelector(`#undo-display-${idx}`);
+        undoDiv.innerHTML = `<a href="#" class="undo-btn" data-idx="${idx}">Undo delete</a>`;
+
+        // Hook up Undo
+        undoDiv.querySelector('.undo-btn').addEventListener('click', ue => {
+          ue.preventDefault();
+          if (lastDeleted !== null) {
+            localStorage.setItem(key, lastDeleted);
+            content.querySelector(`#note-display-${idx}`).textContent = lastDeleted;
+          }
+          undoDiv.textContent = '';
+        });
+      });
+    });
+  </script>
+
+  <script>
+    // Share overla
