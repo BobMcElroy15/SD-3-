@@ -16,6 +16,8 @@
   <style>
     body { margin:0; padding:0; }
     #map { height:100vh; }
+
+    /* Title and dropdown */
     #title {
       position:absolute; top:10px; left:5%; width:90%; max-width:90%;
       z-index:1000; background:white; padding:6px; border-radius:6px;
@@ -26,30 +28,44 @@
       z-index:1000; background:white; padding:6px; border-radius:6px;
       font-size:14px;
     }
-    /* Share overlay */
+
+    /* Share button */
     #shareBtn {
       position:absolute; top:110px; left:5%; z-index:1000;
       background:#0066cc; color:#fff; padding:8px 12px; border:none;
       border-radius:4px; font-size:14px; cursor:pointer;
     }
+
+    /* Hidden overlay by default */
     #shareOverlay {
-      display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+      display:none;
+      position:fixed; top:0; left:0; width:100%; height:100%;
       background:rgba(0,0,0,0.7); display:flex; align-items:center;
       justify-content:center; z-index:2000;
     }
     #shareOverlayContent {
       background:#fff; padding:20px; border-radius:8px; text-align:center;
     }
-    #shareOverlayContent img { max-width:80vw; height:auto; }
+    #shareOverlayContent img {
+      max-width:80vw; height:auto;
+    }
     #closeShare {
       margin-top:10px; background:#333; color:#fff; border:none;
       padding:8px 12px; border-radius:4px; cursor:pointer;
+    }
+
+    @media(min-width:600px){
+      #title { left:50px; width:auto; max-width:400px; }
+      #stationSelect { left:50px; width:auto; max-width:300px; }
+      #shareBtn { left:50px; }
     }
   </style>
 </head>
 <body>
   <div id="title">Sewer District 3 Pump Station Map</div>
-  <select id="stationSelect"><option value="">Select Pump Station</option></select>
+  <select id="stationSelect">
+    <option value="">Select Pump Station</option>
+  </select>
   <button id="shareBtn">Share</button>
 
   <div id="shareOverlay">
@@ -64,12 +80,11 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
   <!-- Firebase compat SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
-    // Your Firebase config
+    // ↳ Your actual Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain: "sd3ps-map.firebaseapp.com",
@@ -84,7 +99,7 @@
   </script>
 
   <script>
-    // Pump station data
+    // ‾‾ Pump station data array ‾‾
     const stations = [
       {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -105,19 +120,22 @@
       {"code":"PS#317-2","lat":40.7868774,"lon":-73.406908,"address":"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Initialize map
+    // Initialize Leaflet map
     const map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
+    // Temp store for undo deletes
     const tempDeleted = {};
+
+    // Build dropdown and markers
     const select = document.getElementById('stationSelect');
     const markers = [];
 
-    // Build markers & dropdown
     stations.forEach((st, idx) => {
-      const popupHtml = `
+      // Popup HTML
+      const popup = `
         <strong>${st.code}</strong><br>
         ${st.address}<br>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
@@ -129,49 +147,48 @@
         <a href="#" class="undo-note-btn" data-idx="${idx}" style="display:none">Undo Delete</a>
         <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;"></div>
       `;
-      const m = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popupHtml);
-      markers.push(m);
+      markers[idx] = L.marker([st.lat, st.lon])
+        .addTo(map)
+        .bindPopup(popup);
 
+      // Dropdown option
       const opt = document.createElement('option');
       opt.value = idx;
       opt.text  = `${st.code} – ${st.address}`;
       select.appendChild(opt);
     });
 
-    // Zoom & open popup on dropdown select
+    // Zoom & open popup on select
     select.addEventListener('change', () => {
       const i = select.value;
       map.setView([stations[i].lat, stations[i].lon], 17);
       markers[i].openPopup();
     });
 
-    // Handle popup logic (load & display note each open)
+    // Handle notes & undo on each popup open
     map.on('popupopen', e => {
       const c = e.popup._contentNode;
       const idx = c.querySelector('.note-btn').dataset.idx;
       const code = stations[idx].code;
       const docRef = db.collection('notes').doc(code);
       const disp = c.querySelector(`#note-display-${idx}`);
-      const add = c.querySelector('.note-btn');
-      const del = c.querySelector('.delete-note-btn');
+      const add  = c.querySelector('.note-btn');
+      const del  = c.querySelector('.delete-note-btn');
       const undo = c.querySelector('.undo-note-btn');
 
-      // Load existing note
+      // Load the current note
       docRef.get().then(doc => {
         disp.textContent = doc.exists ? doc.data().text : '';
       });
 
-      // Add/Edit
+      // Add or Edit
       add.onclick = ev => {
         ev.preventDefault();
         docRef.get().then(doc => {
           const cur = doc.exists ? doc.data().text : '';
           const note = prompt(`Note for ${code}:`, cur);
           if (note !== null) {
-            docRef.set({
-              text: note,
-              updated: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            docRef.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
             disp.textContent = note;
             undo.style.display = 'none';
           }
@@ -190,31 +207,28 @@
         });
       };
 
-      // Undo
+      // Undo Delete
       undo.onclick = ev => {
         ev.preventDefault();
         const prev = tempDeleted[code];
         if (prev !== undefined) {
-          docRef.set({
-            text: prev,
-            updated: firebase.firestore.FieldValue.serverTimestamp()
-          }).then(() => {
-            disp.textContent = prev;
-            undo.style.display = 'none';
-            delete tempDeleted[code];
-          });
+          docRef.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() })
+            .then(() => {
+              disp.textContent = prev;
+              undo.style.display = 'none';
+              delete tempDeleted[code];
+            });
         }
       };
     });
-  </script>
 
-  <script>
     // Share overlay logic
-    const sb = document.getElementById('shareBtn'),
-          ov = document.getElementById('shareOverlay'),
-          cb = document.getElementById('closeShare');
-    sb.addEventListener('click', () => ov.style.display = 'flex');
-    cb.addEventListener('click', () => ov.style.display = 'none');
+    document.getElementById('shareBtn').onclick = () => {
+      document.getElementById('shareOverlay').style.display = 'flex';
+    };
+    document.getElementById('closeShare').onclick = () => {
+      document.getElementById('shareOverlay').style.display = 'none';
+    };
   </script>
 </body>
 </html>
