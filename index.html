@@ -6,37 +6,57 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0066cc">
-  <link 
-    rel="stylesheet" 
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
   <style>
-    body { margin:0; padding:0 }
-    #map { height:100vh }
-    #title { position:absolute; top:10px; left:5%; width:90%; max-width:90%;
+    body { margin:0; padding:0; }
+    #map { height:100vh; }
+    #title {
+      position:absolute; top:10px; left:5%; width:90%; max-width:90%;
       z-index:1000; background:white; padding:6px; border-radius:6px;
-      font-size:18px; font-weight:bold; text-align:center; }
-    #stationSelect { position:absolute; top:60px; left:5%; width:90%; max-width:90%;
+      font-size:18px; font-weight:bold; text-align:center;
+    }
+    #stationSelect {
+      position:absolute; top:60px; left:5%; width:90%; max-width:90%;
       z-index:1000; background:white; padding:6px; border-radius:6px;
-      font-size:14px; }
-    #installBtn { position:absolute; top:110px; left:5%; z-index:1000;
+      font-size:14px;
+    }
+    #installBtn {
+      position:absolute; top:110px; left:5%; z-index:1000;
       background:#0066cc; color:white; padding:8px; border:none;
-      border-radius:4px; font-size:14px; }
+      border-radius:4px; font-size:14px; cursor:pointer;
+    }
     @media(min-width:600px){
       #title { left:50px; width:auto; max-width:400px; }
       #stationSelect { left:50px; width:auto; max-width:300px; }
       #installBtn { left:50px; }
     }
     /* Share overlay */
-    #shareBtn { position:absolute; top:150px; left:5%; z-index:1000;
+    #shareBtn {
+      position:absolute; top:150px; left:5%; z-index:1000;
       background:#0066cc; color:#fff; padding:8px 12px; border:none;
-      border-radius:4px; font-size:14px; cursor:pointer; }
-    #shareOverlay{ display:none; position:fixed; top:0; left:0; width:100%; height:100%;
-      background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center;
-      z-index:2000; }
-    #shareOverlayContent { background:#fff; padding:20px; border-radius:8px; text-align:center; }
-    #shareOverlayContent img { max-width:80vw; height:auto; }
-    #closeShare { margin-top:10px; background:#333; color:#fff; border:none;
-      padding:8px 12px; border-radius:4px; cursor:pointer; }
+      border-radius:4px; font-size:14px; cursor:pointer;
+    }
+    #shareOverlay {
+      display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.7); display:flex; align-items:center;
+      justify-content:center; z-index:2000;
+    }
+    #shareOverlayContent {
+      background:#fff; padding:20px; border-radius:8px; text-align:center;
+    }
+    #shareOverlayContent img {
+      max-width:80vw; height:auto;
+    }
+    #closeShare {
+      margin-top:10px; background:#333; color:#fff; border:none;
+      padding:8px 12px; border-radius:4px; cursor:pointer;
+    }
   </style>
 </head>
 <body>
@@ -47,10 +67,10 @@
   <button id="installBtn" style="display:none">Install App</button>
   <button id="shareBtn">Share</button>
 
-  <div id="shareOverlay" style="display:none">
+  <div id="shareOverlay">
     <div id="shareOverlayContent">
       <p>Scan to share:</p>
-      <img src="qr-code.png" alt="QR code"><br>
+      <img src="qr-code.png" alt="Share via QR code"><br>
       <button id="closeShare">Close</button>
     </div>
   </div>
@@ -60,16 +80,16 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Firebase compat JS -->
+  <!-- Firebase compat SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
-    // Your Firebase config (compat)
+    // Your Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain: "sd3ps-map.firebaseapp.com",
       projectId: "sd3ps-map",
-      storageBucket: "sd3ps-map.firebasestorage.app",
+      storageBucket: "sd3ps-map.appspot.com",
       messagingSenderId: "14976888367",
       appId: "1:14976888367:web:9ef05a76be1ca780d7e0da",
       measurementId: "G-HHX1X8KFSF"
@@ -88,17 +108,19 @@
       installBtn.style.display = 'block';
     });
     installBtn.addEventListener('click', () => {
-      installBtn.style.display = 'none';
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then(() => deferredPrompt = null);
+      installBtn.style.display = 'none';
     });
 
-    // Service Worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
+    // Conditionally register SW (skip in standalone PWA so we always fetch fresh)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                      || window.navigator.standalone === true;
+    if (!isStandalone && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // Pump stations
+    // Pump station data
     const stations = [
       {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -119,17 +141,17 @@
       {"code":"PS#317-2","lat":40.7868774,"lon":-73.406908,"address":"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Init map
+    // Initialize map
     const map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      attribution:'© OpenStreetMap contributors'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
     const tempDeleted = {};
     const select = document.getElementById('stationSelect');
     const markers = [];
 
-    // Create markers & dropdown
+    // Build markers & dropdown
     stations.forEach((st, idx) => {
       const popupHtml = `
         <strong>${st.code}</strong><br>
@@ -152,7 +174,7 @@
       select.appendChild(opt);
     });
 
-    // Zoom & open popup
+    // Zoom & open on select
     select.addEventListener('change', () => {
       const i = select.value;
       map.setView([stations[i].lat, stations[i].lon], 17);
@@ -161,69 +183,7 @@
 
     // Handle popup logic
     map.on('popupopen', e => {
-      const ctn  = e.popup._contentNode;
-      const idx  = ctn.querySelector('.note-btn').dataset.idx;
+      const c = e.popup._contentNode;
+      const idx = c.querySelector('.note-btn').dataset.idx;
       const code = stations[idx].code;
-      const docRef = db.collection('notes').doc(code);
-      const disp = ctn.querySelector(`#note-display-${idx}`);
-      const addBtn = ctn.querySelector('.note-btn');
-      const delBtn = ctn.querySelector('.delete-note-btn');
-      const undoBtn = ctn.querySelector('.undo-note-btn');
-
-      // Load and display the note
-      docRef.get().then(doc => {
-        disp.textContent = doc.exists ? doc.data().text : '';
-      });
-
-      // Add/Edit
-      addBtn.onclick = ev => {
-        ev.preventDefault();
-        docRef.get().then(doc => {
-          const cur = doc.exists ? doc.data().text : '';
-          const note = prompt(`Note for ${code}:`, cur);
-          if (note !== null) {
-            docRef.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
-            disp.textContent = note;
-            undoBtn.style.display = 'none';
-          }
-        });
-      };
-
-      // Delete
-      delBtn.onclick = ev => {
-        ev.preventDefault();
-        docRef.get().then(doc => {
-          tempDeleted[code] = doc.exists ? doc.data().text : '';
-          return docRef.delete();
-        }).then(() => {
-          disp.textContent = '';
-          undoBtn.style.display = 'inline';
-        });
-      };
-
-      // Undo
-      undoBtn.onclick = ev => {
-        ev.preventDefault();
-        const prev = tempDeleted[code];
-        if (prev !== undefined) {
-          docRef.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() })
-            .then(() => {
-              disp.textContent = prev;
-              undoBtn.style.display = 'none';
-              delete tempDeleted[code];
-            });
-        }
-      };
-    });
-  </script>
-
-  <script>
-    // Share overlay
-    const sb = document.getElementById('shareBtn'),
-          ov = document.getElementById('shareOverlay'),
-          cb = document.getElementById('closeShare');
-    sb.addEventListener('click', () => ov.style.display = 'flex');
-    cb.addEventListener('click', () => ov.style.display = 'none');
-  </script>
-</body>
-</html>
+      const docRef = db.collection('notes').doc(code
