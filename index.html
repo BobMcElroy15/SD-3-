@@ -103,12 +103,12 @@
 
     // Full station list with codes, coords, and addresses
     const stations = [
-      {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.23075269999998,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
+      {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
-      {"code":"PS#302","lat":40.704264,"lon":-73.25481919999999,"address":"33 Girard Ave, Brightwaters, NY 11718"},
-      {"code":"PS#303","lat":40.7058464,"lon":-73.25095590000001,"address":"1 Shore Road East, Brightwaters, NY 11718"},
-      {"code":"PS#304","lat":40.7138133,"lon":-73.24673380000002,"address":"7 Prospect Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#305","lat":40.71697149999999,"lon":-73.24245630000001,"address":"89 Maple Avenue, Bay Shore, NY 11706"},
+      {"code":"PS#302","lat":40.704264,"lon":-73.2548192,"address":"33 Girard Ave, Brightwaters, NY 11718"},
+      {"code":"PS#303","lat":40.7058464,"lon":-73.2509559,"address":"1 Shore Road East, Brightwaters, NY 11718"},
+      {"code":"PS#304","lat":40.7138133,"lon":-73.2467338,"address":"7 Prospect Avenue, Bay Shore, NY 11706"},
+      {"code":"PS#305","lat":40.7169715,"lon":-73.2424563,"address":"89 Maple Avenue, Bay Shore, NY 11706"},
       {"code":"PS#306","lat":40.7195939,"lon":-73.2375154,"address":"83 South Montgomery Avenue, Bay Shore, NY 11706"},
       {"code":"PS#307","lat":40.7145541,"lon":-73.2211747,"address":"600 Ocean Avenue, Islip, NY 11751"},
       {"code":"PS#308","lat":40.7143538,"lon":-73.1967512,"address":"57 The Helm, East Islip, NY 11730"},
@@ -129,20 +129,26 @@
       { attribution: '© OpenStreetMap contributors' }
     ).addTo(map);
 
-    // Populate dropdown and add markers
+    // Populate dropdown and add markers with Navigate + Add Note
     const select = document.getElementById('stationSelect');
     const markers = [];
     stations.forEach((st, idx) => {
-      const marker = L.marker([st.lat, st.lon]).addTo(map)
-        .bindPopup(
-          `<strong>${st.code}</strong><br>${st.address}` +
-          `<br><a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>`
-        );
-      markers.push(marker);
+      const popupHtml = `
+        <strong>${st.code}</strong><br>
+        ${st.address}<br>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
+        <span> | </span>
+        <a href="#" class="note-btn" data-idx="${idx}">Add Note</a>
+        <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;">
+          ${localStorage.getItem('note-' + st.code) || ''}
+        </div>
+      `;
+      const m = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popupHtml);
+      markers.push(m);
 
       const opt = document.createElement('option');
       opt.value = idx;
-      opt.text = `${st.code} - ${st.address}`;
+      opt.text = `${st.code} – ${st.address}`;
       select.appendChild(opt);
     });
 
@@ -152,20 +158,5 @@
       map.setView([st.lat, st.lon], 17);
       markers[select.value].openPopup();
     });
-  </script>
 
-  <script>
-    // Share overlay logic
-    const shareBtn = document.getElementById('shareBtn');
-    const overlay = document.getElementById('shareOverlay');
-    const closeShare = document.getElementById('closeShare');
-
-    shareBtn.addEventListener('click', () => {
-      overlay.style.display = 'flex';
-    });
-    closeShare.addEventListener('click', () => {
-      overlay.style.display = 'none';
-    });
-  </script>
-</body>
-</html>
+    //
