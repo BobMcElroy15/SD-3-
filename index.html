@@ -87,7 +87,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <script>
-    // Initialize Firebase
+    // Firebase init
     firebase.initializeApp({
       apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain: "sd3ps-map.firebaseapp.com",
@@ -99,7 +99,7 @@
     });
     const db = firebase.firestore();
 
-    // PWA install prompt handling
+    // PWA install prompt
     let deferredPrompt;
     const installBtn = document.getElementById('installBtn');
     window.addEventListener('beforeinstallprompt', e => {
@@ -114,13 +114,12 @@
       deferredPrompt = null;
     });
 
-    // Register service worker
+    // Register SW
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .catch(console.error);
+      navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // Pump station data
+    // Station data
     const stations = [
       {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -141,19 +140,19 @@
       {"code":"PS#317-2","lat":40.7868774,"lon":-73.406908,"address":"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Initialize map
+    // Init map
     const map = L.map('map').setView([40.730889, -73.284654], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Build dropdown, markers, and notes
+    // Build dropdown & markers
     const select = document.getElementById('stationSelect');
     const markers = [];
     const tempDeleted = {};
 
     stations.forEach((st, idx) => {
-      const popupHtml = `
+      const popup = `
         <strong>${st.code}</strong><br>
         ${st.address}<br>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
@@ -165,7 +164,7 @@
         <a href="#" class="undo-note-btn" data-idx="${idx}" style="display:none">Undo Delete</a>
         <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;"></div>
       `;
-      markers[idx] = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popupHtml);
+      markers[idx] = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popup);
 
       const opt = document.createElement('option');
       opt.value = idx;
@@ -173,21 +172,23 @@
       select.appendChild(opt);
     });
 
+    // Zoom & popup on select
     select.addEventListener('change', () => {
       const i = select.value;
       map.setView([stations[i].lat, stations[i].lon], 17);
       markers[i].openPopup();
     });
 
+    // Note logic
     map.on('popupopen', e => {
-      const c    = e.popup._contentNode;
-      const idx  = c.querySelector('.note-btn').dataset.idx;
-      const code = stations[idx].code;
-      const doc  = db.collection('notes').doc(code);
-      const disp = c.querySelector(`#note-display-${idx}`);
-      const add  = c.querySelector('.note-btn');
-      const del  = c.querySelector('.delete-note-btn');
-      const undo = c.querySelector('.undo-note-btn');
+      const c   = e.popup._contentNode;
+      const idx = c.querySelector('.note-btn').dataset.idx;
+      const code= stations[idx].code;
+      const doc = db.collection('notes').doc(code);
+      const disp= c.querySelector(`#note-display-${idx}`);
+      const add = c.querySelector('.note-btn');
+      const del = c.querySelector('.delete-note-btn');
+      const undo= c.querySelector('.undo-note-btn');
 
       doc.get().then(d => disp.textContent = d.exists ? d.data().text : '');
 
@@ -229,7 +230,7 @@
       };
     });
 
-    // Share overlay toggles
+    // Share overlay
     document.getElementById('shareBtn').onclick = () => {
       document.getElementById('shareOverlay').style.display = 'flex';
     };
