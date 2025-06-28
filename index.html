@@ -4,6 +4,15 @@
   <meta charset="utf-8">
   <title>Sewer District 3 Pump Station Map</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <!-- Force‐unregister any old SW so we don’t keep serving stale HTML -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations()
+        .then(regs => regs.forEach(r => r.unregister()));
+    }
+  </script>
+
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0066cc">
 
@@ -67,6 +76,7 @@
   <select id="stationSelect">
     <option value="">Select Pump Station</option>
   </select>
+
   <button id="installBtn">Install App</button>
   <button id="shareBtn">Share</button>
 
@@ -87,7 +97,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <script>
-    // Firebase init
+    // Initialize Firebase
     firebase.initializeApp({
       apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain: "sd3ps-map.firebaseapp.com",
@@ -114,12 +124,13 @@
       deferredPrompt = null;
     });
 
-    // Register SW
+    // Register the fresh service worker
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(console.error);
+      navigator.serviceWorker.register('service-worker.js')
+        .catch(console.error);
     }
 
-    // Station data
+    // Pump station data
     const stations = [
       {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -140,19 +151,19 @@
       {"code":"PS#317-2","lat":40.7868774,"lon":-73.406908,"address":"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Init map
+    // Initialize map
     const map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Build dropdown & markers
+    // Populate dropdown & markers
     const select = document.getElementById('stationSelect');
     const markers = [];
     const tempDeleted = {};
 
     stations.forEach((st, idx) => {
-      const popup = `
+      const html = `
         <strong>${st.code}</strong><br>
         ${st.address}<br>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
@@ -162,9 +173,9 @@
         <a href="#" class="delete-note-btn" data-idx="${idx}">Delete Note</a>
         <span> | </span>
         <a href="#" class="undo-note-btn" data-idx="${idx}" style="display:none">Undo Delete</a>
-        <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;"></div>
+        <div id="note-display-${idx}" style="margin:8px 0 0;font-style:italic;color:#555;"></div>
       `;
-      markers[idx] = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popup);
+      markers[idx] = L.marker([st.lat, st.lon]).addTo(map).bindPopup(html);
 
       const opt = document.createElement('option');
       opt.value = idx;
@@ -172,14 +183,12 @@
       select.appendChild(opt);
     });
 
-    // Zoom & popup on select
     select.addEventListener('change', () => {
       const i = select.value;
       map.setView([stations[i].lat, stations[i].lon], 17);
       markers[i].openPopup();
     });
 
-    // Note logic
     map.on('popupopen', e => {
       const c   = e.popup._contentNode;
       const idx = c.querySelector('.note-btn').dataset.idx;
@@ -230,7 +239,7 @@
       };
     });
 
-    // Share overlay
+    // Share overlay toggles
     document.getElementById('shareBtn').onclick = () => {
       document.getElementById('shareOverlay').style.display = 'flex';
     };
