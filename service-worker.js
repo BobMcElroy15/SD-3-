@@ -1,9 +1,8 @@
 // service-worker.js
 
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 const CACHE_NAME    = `sd3ps-cache-v${CACHE_VERSION}`;
 
-// URLs to precache
 const PRECACHE_URLS = [
   '/', '/index.html', '/manifest.json', '/qr-code.png',
   '/icons/192.png', '/icons/512.png',
@@ -34,8 +33,6 @@ self.addEventListener('activate', evt => {
 
 self.addEventListener('fetch', evt => {
   const req = evt.request;
-
-  // Network-first for navigations
   if (req.mode === 'navigate' ||
      (req.method === 'GET' && req.headers.get('accept').includes('text/html'))) {
     evt.respondWith(
@@ -49,8 +46,6 @@ self.addEventListener('fetch', evt => {
     );
     return;
   }
-
-  // Cache-first for everything else
   evt.respondWith(
     caches.match(req).then(cached =>
       cached || fetch(req).then(res => {
