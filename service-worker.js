@@ -3,9 +3,9 @@
 const CACHE_VERSION = 1;
 const CACHE_NAME    = `sd3ps-cache-v${CACHE_VERSION}`;
 
-// List of URLs to precache
+// URLs to precache during installation
 const PRECACHE_URLS = [
-  '/',               // Alias for index.html
+  '/',               // index.html
   '/index.html',
   '/manifest.json',
   '/qr-code.png',
@@ -19,7 +19,7 @@ const PRECACHE_URLS = [
   'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js'
 ];
 
-// INSTALL: cache app shell
+// Install: cache core assets
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -28,30 +28,30 @@ self.addEventListener('install', event => {
   );
 });
 
-// ACTIVATE: remove old caches
+// Activate: remove old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
+    caches.keys()
+      .then(keys => Promise.all(
         keys
           .filter(key => key !== CACHE_NAME)
           .map(key => caches.delete(key))
-      )
-    ).then(() => self.clients.claim())
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
-// FETCH: network-first for navigations, cache-first for everything else
+// Fetch: network-first for HTML, cache-first for everything else
 self.addEventListener('fetch', event => {
   const req = event.request;
 
-  // Network-first for HTML pages (navigations)
+  // Network-first for navigation requests (HTML pages)
   if (req.mode === 'navigate' ||
       (req.method === 'GET' && req.headers.get('accept').includes('text/html'))) {
     event.respondWith(
       fetch(req)
         .then(response => {
-          // Update cache with the fresh HTML
+          // Update cache with fresh HTML
           const copy = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put('/', copy));
           return response;
@@ -63,11 +63,11 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first for all other assets
+  // Cache-first for all other requests (JS/CSS/images/etc.)
   event.respondWith(
     caches.match(req).then(cached => {
       return cached || fetch(req).then(response => {
-        // Cache the new resource
+        // Cache the fetched resource
         const copy = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
         return response;
