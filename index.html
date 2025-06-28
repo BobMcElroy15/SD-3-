@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>Sewer District 3 Pump Station Map</title>
@@ -34,157 +34,21 @@
       #installBtn { left:50px; }
     }
 
-    /* — Share button and overlay — */
+    /* — Share overlay — */
     #shareBtn {
       position:absolute; top:150px; left:5%; z-index:1000;
       background:#0066cc; color:#fff; padding:8px 12px; border:none;
       border-radius:4px; font-size:14px; cursor:pointer;
     }
     #shareOverlay {
-      display:none;
-      position:fixed; top:0; left:0; width:100%; height:100%;
+      display:none; position:fixed; top:0; left:0; width:100%; height:100%;
       background:rgba(0,0,0,0.7); display:flex; align-items:center;
       justify-content:center; z-index:2000;
     }
     #shareOverlayContent {
-      background:#fff; padding:20px; border-radius:8px;
-      text-align:center;
+      background:#fff; padding:20px; border-radius:8px; text-align:center;
     }
     #shareOverlayContent img {
       max-width:80vw; height:auto;
     }
     #closeShare {
-      margin-top:10px; background:#333; color:#fff; border:none;
-      padding:8px 12px; border-radius:4px; cursor:pointer;
-    }
-  </style>
-</head>
-<body>
-  <div id="title">Sewer District 3 Pump Station Map</div>
-
-  <select id="stationSelect">
-    <option value="">Select Pump Station</option>
-  </select>
-
-  <button id="installBtn" style="display:none">Install App</button>
-  <button id="shareBtn">Share</button>
-
-  <div id="shareOverlay" style="display:none">
-    <div id="shareOverlayContent">
-      <p>Scan to share:</p>
-      <img src="qr-code.png" alt="Share via QR code">
-      <br>
-      <button id="closeShare">Close</button>
-    </div>
-  </div>
-
-  <div id="map"></div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    // PWA install handler
-    let deferredPrompt;
-    const installBtn = document.getElementById('installBtn');
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault();
-      deferredPrompt = e;
-      installBtn.style.display = 'block';
-    });
-    installBtn.addEventListener('click', () => {
-      installBtn.style.display = 'none';
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
-    });
-
-    // Register the service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
-    }
-
-    // Full station list with codes, coords, and addresses
-    const stations = [
-      {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
-      {"code":"PS#302","lat":40.704264,"lon":-73.2548192,"address":"33 Girard Ave, Brightwaters, NY 11718"},
-      {"code":"PS#303","lat":40.7058464,"lon":-73.2509559,"address":"1 Shore Road East, Brightwaters, NY 11718"},
-      {"code":"PS#304","lat":40.7138133,"lon":-73.2467338,"address":"7 Prospect Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#305","lat":40.7169715,"lon":-73.2424563,"address":"89 Maple Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#306","lat":40.7195939,"lon":-73.2375154,"address":"83 South Montgomery Avenue, Bay Shore, NY 11706"},
-      {"code":"PS#307","lat":40.7145541,"lon":-73.2211747,"address":"600 Ocean Avenue, Islip, NY 11751"},
-      {"code":"PS#308","lat":40.7143538,"lon":-73.1967512,"address":"57 The Helm, East Islip, NY 11730"},
-      {"code":"PS#309","lat":40.6618005,"lon":-73.4190788,"address":"219 Richmond Avenue, Amityville, NY 11701"},
-      {"code":"PS#310","lat":40.6583148,"lon":-73.4003024,"address":"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
-      {"code":"PS#311","lat":40.7751554,"lon":-73.2063197,"address":"71 Beech Street, Central Islip, NY 11722"},
-      {"code":"PS#312","lat":40.7872918,"lon":-73.2842493,"address":"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
-      {"code":"PS#313","lat":40.7786667,"lon":-73.1933449,"address":"1 Fairlawn Drive, Central Islip, NY 11722"},
-      {"code":"PS#314","lat":40.751412,"lon":-73.360911,"address":"2 Irving Avenue, Wyandanch, NY 11798"},
-      {"code":"PS#317-1","lat":40.8203973,"lon":-73.4078002,"address":"New York Avenue, South Huntington, NY 11746"},
-      {"code":"PS#317-2","lat":40.7868774,"lon":-73.406908,"address":"270 McGovern Drive, Melville, NY 11747"}
-    ];
-
-    // Initialize the map
-    const map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer(
-      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      { attribution: '© OpenStreetMap contributors' }
-    ).addTo(map);
-
-    // Populate dropdown and add markers with Navigate + Add Note
-    const select = document.getElementById('stationSelect');
-    const markers = [];
-    stations.forEach((st, idx) => {
-      const popupHtml = `
-        <strong>${st.code}</strong><br>
-        ${st.address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
-        <span> | </span>
-        <a href="#" class="note-btn" data-idx="${idx}">Add Note</a>
-        <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;">
-          ${localStorage.getItem('note-' + st.code) || ''}
-        </div>
-      `;
-      const m = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popupHtml);
-      markers.push(m);
-
-      const opt = document.createElement('option');
-      opt.value = idx;
-      opt.text = `${st.code} – ${st.address}`;
-      select.appendChild(opt);
-    });
-
-    // Zoom & popup on selection
-    select.addEventListener('change', () => {
-      const st = stations[select.value];
-      map.setView([st.lat, st.lon], 17);
-      markers[select.value].openPopup();
-    });
-
-    // Handle Add Note clicks on each popup
-    map.on('popupopen', e => {
-      const btn = e.popup._contentNode.querySelector('.note-btn');
-      if (!btn) return;
-      btn.addEventListener('click', ev => {
-        ev.preventDefault();
-        const idx = btn.dataset.idx;
-        const st = stations[idx];
-        const key = 'note-' + st.code;
-        const current = localStorage.getItem(key) || '';
-        const note = prompt(`Enter note for ${st.code}:`, current);
-        if (note !== null) {
-          localStorage.setItem(key, note);
-          document.getElementById(`note-display-${idx}`).textContent = note;
-        }
-      });
-    });
-  </script>
-
-  <script>
-    // Share overlay logic
-    const shareBtn = document.getElementById('shareBtn');
-    const overlay = document.getElementById('shareOverlay');
-    const closeShare = document.getElementById('closeShare');
-    shareBtn.addEventListener('click', () => overlay.style.display = 'flex');
-    closeShare.addEventListener('click', () => overlay.style.display = 'none');
-  </script>
-</body>
-</html>
