@@ -1,71 +1,73 @@
 // service-worker.js
-const CACHE_VERSION = 2; // ← bump this on every major update
-const CACHE_NAME = `sd3ps-cache-v${CACHE_VERSION}`;
+
+// ↑↑ bump this on every update ↑↑
+const CACHE_VERSION = 4;
+const CACHE_NAME    = `sd3ps-cache-v${CACHE_VERSION}`;
+
 const PRECACHE_URLS = [
-  '/',              // makes index.html cacheable
+  '/',                // root → index.html
   '/index.html',
   '/manifest.json',
   '/qr-code.png',
-  // if you have an icons folder, list them here:
+  // your local icons
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  // you can also cache the Leaflet CSS/JS if you want:
+  // Leaflet assets
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  // Firebase compat SDKs
+  'https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js'
 ];
 
-// Install – precache the “shell”
-self.addEventListener('install', event => {
-  event.waitUntil(
+// 1) Install – precache the app shell and SDKs
+self.addEventListener('install', evt => {
+  evt.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(PRECACHE_URLS))
       .then(() => self.skipWaiting())
   );
 });
 
-// Activate – purge old caches
-self.addEventListener('activate', event => {
-  event.waitUntil(
+// 2) Activate – delete any old caches
+self.addEventListener('activate', evt => {
+  evt.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.filter(k => k !== CACHE_NAME)
-            .map(k => caches.delete(k))
+        keys.filter(key => key !== CACHE_NAME)
+            .map(key => caches.delete(key))
       )
     ).then(() => self.clients.claim())
   );
 });
 
-// Fetch – network-first for navigation, cache-first for everything else
-self.addEventListener('fetch', event => {
-  const req = event.request;
+// 3) Fetch – Network‐First for HTML navigations, Cache‐First for everything else
+self.addEventListener('fetch', evt => {
+  const req = evt.request;
 
-  // For HTML pages (navigations), do NetworkFirst
-  if (req.mode === 'navigate' || (req.method === 'GET'
-      && req.headers.get('accept').includes('text/html'))) {
-    event.respondWith(
+  // a) HTML pages (navigations) – Network first, fallback to cache
+  if (req.mode === 'navigate' ||
+     (req.method === 'GET' && req.headers.get('accept').includes('text/html'))) {
+    evt.respondWith(
       fetch(req)
-        .then(resp => {
-          // update cache
-          const copy = resp.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
-          return resp;
+        .then(res => {
+          // update our cache for offline
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put('/', copy));
+          return res;
         })
-        .catch(() =>
-          caches.match(req).then(cached => cached)
-        )
+        .catch(() => caches.match('/') || caches.match('/index.html'))
     );
     return;
   }
 
-  // For everything else, you can do CacheFirst (or adjust as needed)
-  event.respondWith(
+  // b) All other requests – Cache first, then network & cache
+  evt.respondWith(
     caches.match(req).then(cached => {
-      return cached || fetch(req).then(resp => {
-        // optionally cache new resources
-        const copy = resp.clone();
-        caches.open(CACHE_NAME)
-              .then(cache => cache.put(req, copy));
-        return resp;
+      return cached || fetch(req).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
+        return res;
       });
     })
   );
