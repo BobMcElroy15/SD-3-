@@ -186,4 +186,66 @@
       const c = e.popup._contentNode;
       const idx = c.querySelector('.note-btn').dataset.idx;
       const code = stations[idx].code;
-      const docRef = db.collection('notes').doc(code
+      const docRef = db.collection('notes').doc(code);
+      const disp = c.querySelector(`#note-display-${idx}`);
+      const add = c.querySelector('.note-btn');
+      const del = c.querySelector('.delete-note-btn');
+      const undo = c.querySelector('.undo-note-btn');
+
+      // Load note on open
+      docRef.get().then(doc => {
+        disp.textContent = doc.exists ? doc.data().text : '';
+      });
+
+      // Add/Edit
+      add.onclick = ev => {
+        ev.preventDefault();
+        docRef.get().then(doc => {
+          const cur = doc.exists ? doc.data().text : '';
+          const note = prompt(`Note for ${code}:`, cur);
+          if (note !== null) {
+            docRef.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
+            disp.textContent = note;
+            undo.style.display = 'none';
+          }
+        });
+      };
+
+      // Delete
+      del.onclick = ev => {
+        ev.preventDefault();
+        docRef.get().then(doc => {
+          tempDeleted[code] = doc.exists ? doc.data().text : '';
+          return docRef.delete();
+        }).then(() => {
+          disp.textContent = '';
+          undo.style.display = 'inline';
+        });
+      };
+
+      // Undo
+      undo.onclick = ev => {
+        ev.preventDefault();
+        const prev = tempDeleted[code];
+        if (prev !== undefined) {
+          docRef.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() })
+            .then(() => {
+              disp.textContent = prev;
+              undo.style.display = 'none';
+              delete tempDeleted[code];
+            });
+        }
+      };
+    });
+  </script>
+
+  <script>
+    // Share overlay logic
+    const sb = document.getElementById('shareBtn'),
+          ov = document.getElementById('shareOverlay'),
+          cb = document.getElementById('closeShare');
+    sb.addEventListener('click', () => ov.style.display = 'flex');
+    cb.addEventListener('click', () => ov.style.display = 'none');
+  </script>
+</body>
+</html>
