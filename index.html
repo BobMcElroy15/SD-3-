@@ -11,8 +11,8 @@
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
   <style>
-    body { margin:0; padding:0; }
-    #map { height:100vh; }
+    body { margin:0; padding:0 }
+    #map { height:100vh }
     #title {
       position:absolute; top:10px; left:5%; width:90%; max-width:90%;
       z-index:1000; background:white; padding:6px; border-radius:6px;
@@ -29,12 +29,11 @@
       border-radius:4px; font-size:14px;
     }
     @media(min-width:600px){
-      #title { left:50px; width:auto; max-width:400px; }
-      #stationSelect { left:50px; width:auto; max-width:300px; }
-      #installBtn { left:50px; }
+      #title { left:50px; width:auto; max-width:400px }
+      #stationSelect { left:50px; width:auto; max-width:300px }
+      #installBtn { left:50px }
     }
-
-    /* — Share overlay — */
+    /* Share overlay */
     #shareBtn {
       position:absolute; top:150px; left:5%; z-index:1000;
       background:#0066cc; color:#fff; padding:8px 12px; border:none;
@@ -58,36 +57,35 @@
   </style>
 </head>
 <body>
+
   <div id="title">Sewer District 3 Pump Station Map</div>
-  <select id="stationSelect">
-    <option value="">Select Pump Station</option>
-  </select>
+  <select id="stationSelect"><option value="">Select Pump Station</option></select>
   <button id="installBtn" style="display:none">Install App</button>
   <button id="shareBtn">Share</button>
 
   <div id="shareOverlay" style="display:none">
     <div id="shareOverlayContent">
       <p>Scan to share:</p>
-      <img src="qr-code.png" alt="Share via QR code"><br>
+      <img src="qr-code.png" alt="QR code"><br>
       <button id="closeShare">Close</button>
     </div>
   </div>
 
   <div id="map"></div>
 
-  <!-- Leaflet JS -->
+  <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Firebase compat SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
-    // Your Firebase config
+    // ← YOUR ACTUAL FIREBASE CONFIG BELOW
     const firebaseConfig = {
       apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain: "sd3ps-map.firebaseapp.com",
       projectId: "sd3ps-map",
-      storageBucket: "sd3ps-map.appspot.com",
+      storageBucket: "sd3ps-map.firebasestorage.app",
       messagingSenderId: "14976888367",
       appId: "1:14976888367:web:9ef05a76be1ca780d7e0da",
       measurementId: "G-HHX1X8KFSF"
@@ -111,12 +109,12 @@
       deferredPrompt.userChoice.then(() => deferredPrompt = null);
     });
 
-    // Register service worker
+    // Register SW
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js');
     }
 
-    // Pump station data
+    // Pump stations
     const stations = [
       {"code":"PS#300 AWXIA","lat":40.7227675,"lon":-73.2307527,"address":"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {"code":"PS#301","lat":40.6930405,"lon":-73.2790417,"address":"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -143,92 +141,96 @@
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // For undo
     const tempDeleted = {};
-
-    // Build markers & dropdown
     const select = document.getElementById('stationSelect');
     const markers = [];
-    stations.forEach((st, idx) => {
-      const popup = `
+
+    // Build markers & dropdown
+    stations.forEach((st,idx)=>{
+      const popupHTML = `
         <strong>${st.code}</strong><br>
         ${st.address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}"
+           target="_blank">Navigate</a>
         <span> | </span>
         <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
         <span> | </span>
         <a href="#" class="delete-note-btn" data-idx="${idx}">Delete Note</a>
         <span> | </span>
         <a href="#" class="undo-note-btn" data-idx="${idx}" style="display:none">Undo Delete</a>
-        <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;"></div>
+        <div id="note-display-${idx}"
+             style="margin-top:6px;font-style:italic;color:#555;"></div>
       `;
-      const m = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popup);
+      const m = L.marker([st.lat,st.lon]).addTo(map).bindPopup(popupHTML);
       markers.push(m);
 
       const opt = document.createElement('option');
       opt.value = idx;
       opt.text  = `${st.code} – ${st.address}`;
       select.appendChild(opt);
+
+      // Real-time update listener
+      db.collection('notes').doc(st.code).onSnapshot(doc=>{
+        const disp = document.getElementById(`note-display-${idx}`);
+        if(disp) disp.textContent = doc.exists ? doc.data().text : '';
+      });
     });
 
-    // Zoom & open popup
-    select.addEventListener('change', () => {
+    // Zoom & open
+    select.addEventListener('change',()=>{
       const i = select.value;
-      map.setView([stations[i].lat, stations[i].lon], 17);
+      map.setView([stations[i].lat,stations[i].lon],17);
       markers[i].openPopup();
     });
 
-    // Handle popup logic
-    map.on('popupopen', e => {
-      const ctn     = e.popup._contentNode;
-      const idx     = ctn.querySelector('.note-btn').dataset.idx;
-      const code    = stations[idx].code;
-      const docRef  = db.collection('notes').doc(code);
-      const noteDiv = ctn.querySelector(`#note-display-${idx}`);
-      const addBtn  = ctn.querySelector('.note-btn');
-      const delBtn  = ctn.querySelector('.delete-note-btn');
-      const undoBtn = ctn.querySelector('.undo-note-btn');
-
-      // Load current note
-      docRef.get().then(doc => {
-        noteDiv.textContent = doc.exists ? doc.data().text : '';
-      });
+    // Popup handlers
+    map.on('popupopen',e=>{
+      const c = e.popup._contentNode;
+      const idx = c.querySelector('.note-btn').dataset.idx;
+      const code=stations[idx].code;
+      const docRef=db.collection('notes').doc(code);
+      const disp = c.querySelector(`#note-display-${idx}`);
+      const add = c.querySelector('.note-btn');
+      const del = c.querySelector('.delete-note-btn');
+      const undo= c.querySelector('.undo-note-btn');
 
       // Add/Edit
-      addBtn.onclick = ev => {
+      add.onclick = ev=>{
         ev.preventDefault();
-        docRef.get().then(doc => {
-          const cur = doc.exists ? doc.data().text : '';
-          const note = prompt(`Note for ${code}:`, cur);
-          if (note !== null) {
-            docRef.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
-            noteDiv.textContent = note;
-            undoBtn.style.display = 'none';
+        docRef.get().then(d=>{
+          const cur=d.exists?d.data().text:'';
+          const note=prompt(`Note for ${code}:`,cur);
+          if(note!==null){
+            docRef.set({ text:note, updated:firebase.firestore.FieldValue.serverTimestamp() });
+            disp.textContent=note;
+            undo.style.display='none';
           }
         });
       };
 
       // Delete
-      delBtn.onclick = ev => {
+      del.onclick = ev=>{
         ev.preventDefault();
-        docRef.get().then(doc => {
-          tempDeleted[code] = doc.exists ? doc.data().text : '';
+        docRef.get().then(d=>{
+          tempDeleted[code]=d.exists?d.data().text:'';
           return docRef.delete();
-        }).then(() => {
-          noteDiv.textContent = '';
-          undoBtn.style.display = 'inline';
+        }).then(()=>{
+          disp.textContent='';
+          undo.style.display='inline';
         });
       };
 
       // Undo
-      undoBtn.onclick = ev => {
+      undo.onclick = ev=>{
         ev.preventDefault();
-        const prev = tempDeleted[code];
-        if (prev !== undefined) {
-          docRef.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() });
-          noteDiv.textContent = prev;
-          undoBtn.style.display = 'none';
-          delete tempDeleted[code];
+        const prev=tempDeleted[code];
+        if(prev!==undefined){
+          docRef.set({ text:prev, updated:firebase.firestore.FieldValue.serverTimestamp() })
+            .then(()=>{
+              disp.textContent=prev;
+              undo.style.display='none';
+              delete tempDeleted[code];
+            });
         }
       };
     });
@@ -236,11 +238,11 @@
 
   <script>
     // Share overlay
-    const shareBtn = document.getElementById('shareBtn');
-    const overlay  = document.getElementById('shareOverlay');
-    const closeBtn = document.getElementById('closeShare');
-    shareBtn.addEventListener('click', () => overlay.style.display = 'flex');
-    closeBtn.addEventListener('click', () => overlay.style.display = 'none');
+    const sb=document.getElementById('shareBtn'),
+          ov=document.getElementById('shareOverlay'),
+          cb=document.getElementById('closeShare');
+    sb.addEventListener('click',()=>ov.style.display='flex');
+    cb.addEventListener('click',()=>ov.style.display='none');
   </script>
 </body>
 </html>
