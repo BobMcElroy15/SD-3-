@@ -287,5 +287,15 @@
     document.getElementById('shareBtn').onclick   = () => document.getElementById('shareOverlay').style.display = 'flex';
     document.getElementById('closeShare').onclick = () => document.getElementById('shareOverlay').style.display = 'none';
   </script>
+
+ <!-- Minimal Service Worker registration for install prompt -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('service-worker.js')
+        .catch(console.error);
+    }
+  </script>
+  
 </body>
 </html>
