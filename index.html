@@ -16,31 +16,30 @@
   />
 
   <style>
-    /* ─── Base ───────────────────────────────────────────────────────── */
     body { margin:0; padding:0; }
     #map  { height:100vh; }
 
-    /* ─── Seal ───────────────────────────────────────────────────────── */
+    /* Seal */
     #seal {
       position: absolute;
       top: 10px;
       left: 10px;
-      width: 70px;    /* enlarged from 40px */
+      width: 70px;
       z-index: 1000;
     }
 
-    /* ─── Zoom controls directly below seal ─────────────────────────── */
+    /* Zoom controls below seal */
     .leaflet-control-zoom.leaflet-bar {
       position: absolute !important;
-      top: 80px !important;     /* 10 + 50 + 10px gutter */
+      top: 80px !important;
       left: 10px !important;
       z-index: 1000;
     }
 
-    /* ─── Share & Install App ───────────────────────────────────────── */
+    /* Share & Install */
     #shareBtn, #installBtn {
       position: absolute;
-      left: 80px;                /* 10 + 50 + 10 gutter */
+      left: 80px;
       z-index: 1000;
       background: #0066cc;
       color: #fff;
@@ -50,15 +49,14 @@
       font-size: 14px;
       cursor: pointer;
     }
-    #shareBtn   { top: 85px; }   /* align with zoom */
-    #installBtn { top: 120px;    /* 70 + ~30pzh share height + 10px gutter */
-                  display: none; }
+    #shareBtn   { top: 85px; }
+    #installBtn { top: 120px; display: none; }
 
-    /* ─── Title ───────────────────────────────────────────────────────── */
+    /* Title */
     #title {
       position: absolute;
       top: 10px;
-      left: 80px;               /* clear seal+zoom+buttons */
+      left: 80px;
       right: 5%;
       max-width: 400px;
       background: white;
@@ -70,22 +68,21 @@
       z-index: 900;
     }
 
- /* ─── Dropdown below title, above Share ──────────────────────────── */
-#stationSelect {
-  position: absolute !important;
-  top: 50px !important;    /* between title (10px) and Share (70px) */
-  left: 80px !important;    /* same as your #title’s left */
-  width: calc(100% - 90px) !important; /* leave a little right gutter */
-  max-width: 300px;
-  background: white;
-  padding: 6px;
-  border-radius: 6px;
-  font-size: 14px;
-  z-index: 900;
-}
+    /* Dropdown */
+    #stationSelect {
+      position: absolute !important;
+      top: 50px !important;
+      left: 80px !important;
+      width: calc(100% - 90px) !important;
+      max-width: 300px;
+      background: white;
+      padding: 6px;
+      border-radius: 6px;
+      font-size: 14px;
+      z-index: 900;
+    }
 
-    
-    /* ─── Share Overlay ───────────────────────────────────────────────── */
+    /* Share Overlay */
     #shareOverlay {
       position: fixed;
       top: 0; left: 0;
@@ -119,18 +116,15 @@
 </head>
 
 <body>
-  <!-- Seal + Controls -->
   <img id="seal" src="FlatSeal200px.png" alt="Suffolk County Seal">
   <button id="shareBtn">Share</button>
   <button id="installBtn">Install App</button>
 
-  <!-- Title & Dropdown -->
   <div id="title">Sewer District 3 Pump Station Map</div>
   <select id="stationSelect">
     <option value="">Select Pump Station</option>
   </select>
 
-  <!-- Share Overlay -->
   <div id="shareOverlay">
     <div id="shareOverlayContent">
       <p>Scan to share:</p>
@@ -139,7 +133,6 @@
     </div>
   </div>
 
-  <!-- Map Container -->
   <div id="map"></div>
 
   <!-- Leaflet & Firebase SDKs -->
@@ -201,27 +194,22 @@
       {code:"PS#317-2",lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Initialize map
-    const map = L.map('map').setView([40.730889, -73.284654], 12);
+    // Initialize map WITHOUT default zoom
+    const map = L.map('map');
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // ─── Restrict map to pump-station bounds ────────────────────────────
-// 1) Define the bounds (min lat, min lon) and (max lat, max lon)
-const southWest = L.latLng(40.65, -73.42);
-const northEast = L.latLng(40.82, -73.19);
-const bounds    = L.latLngBounds(southWest, northEast);
+    // Restrict & fit to bounds
+    const southWest = L.latLng(40.65, -73.42);
+    const northEast = L.latLng(40.82, -73.19);
+    const bounds    = L.latLngBounds(southWest, northEast);
 
-// 2) Apply those bounds so users can't pan outside
-map.setMaxBounds(bounds);
-
-// 3) Optionally clamp zoom levels to your area
-map.options.minZoom = 11;
-map.options.maxZoom = 17;
-
-// 4) Re-center if needed
-map.setView(bounds.getCenter(), 12);
+    map.setMaxBounds(bounds);
+    map.options.minZoom = 5;
+    map.options.maxZoom = 17;
+    map.fitBounds(bounds);
 
     // Populate dropdown & markers
     const select = document.getElementById('stationSelect'),
@@ -241,14 +229,14 @@ map.setView(bounds.getCenter(), 12);
       select.appendChild(o);
     });
 
-    // Zoom & open popup on select
+    // On selection, zoom to street level
     select.addEventListener('change', () => {
       const i = +select.value;
       map.setView([stations[i].lat, stations[i].lon], 17);
       markers[i].openPopup();
     });
 
-    // Notes logic
+    // Notes & Share logic (unchanged)
     map.on('popupopen', e => {
       const c    = e.popup._contentNode,
             idx  = c.querySelector('.note-btn').dataset.idx,
@@ -299,12 +287,11 @@ map.setView(bounds.getCenter(), 12);
       };
     });
 
-    // Share overlay toggle
     document.getElementById('shareBtn').onclick   = () => document.getElementById('shareOverlay').style.display = 'flex';
     document.getElementById('closeShare').onclick = () => document.getElementById('shareOverlay').style.display = 'none';
   </script>
 
- <!-- Minimal Service Worker registration for install prompt -->
+  <!-- Minimal Service Worker registration for install prompt -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
@@ -312,6 +299,6 @@ map.setView(bounds.getCenter(), 12);
         .catch(console.error);
     }
   </script>
-  
+
 </body>
 </html>
