@@ -94,7 +94,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
-    // ─── Firebase init ─────────────────────────────────────────────────
+    // ─── Firebase init
     firebase.initializeApp({
       apiKey:    "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:"sd3ps-map.firebaseapp.com",
@@ -102,12 +102,12 @@
     });
     const db = firebase.firestore();
 
-    // ─── Grab buttons ───────────────────────────────────────────────────
-    const installBtn = document.getElementById('installBtn');
-    const shareBtn   = document.getElementById('shareBtn');
-    const closeShare = document.getElementById('closeShare');
+    // ─── Grab buttons
+    const installBtn = document.getElementById('installBtn'),
+          shareBtn   = document.getElementById('shareBtn'),
+          closeShare = document.getElementById('closeShare');
 
-    // ─── PWA install prompt ─────────────────────────────────────────────
+    // ─── PWA install prompt
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
@@ -121,7 +121,7 @@
       deferredPrompt = null;
     });
 
-    // ─── Share overlay toggle ────────────────────────────────────────────
+    // ─── Share overlay toggle
     shareBtn.addEventListener('click', () => {
       document.getElementById('shareOverlay').style.display = 'flex';
     });
@@ -129,13 +129,12 @@
       document.getElementById('shareOverlay').style.display = 'none';
     });
 
-    // ─── Service Worker (install only) ─────────────────────────────────
+    // ─── Service Worker (install only)
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .catch(console.error);
+      navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // ─── Pump station data ──────────────────────────────────────────────
+    // ─── Pump station data
     const stations = [
       {code:"PS#300 AWXIA",lat:40.7227675,lon:-73.2307527,address:"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {code:"PS#301",       lat:40.6930405,lon:-73.2790417,address:"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -143,20 +142,20 @@
       {code:"PS#303",       lat:40.7058464,lon:-73.2509559,address:"1 Shore Road East, Brightwaters, NY 11718"},
       {code:"PS#304",       lat:40.7138133,lon:-73.2467338,address:"7 Prospect Avenue, Bay Shore, NY 11706"},
       {code:"PS#305",       lat:40.7169715,lon:-73.2424563,address:"89 Maple Avenue, Bay Shore, NY 11706"},
-      {code:"PS#306",       lat:40.7195939,lon:-73.2375154,address:"83 South Montgomery Ave, Bay Shore, NY 11706"},
+      {code:"PS#306",       lat:40.7195939,lon:-73.2375154,address:"83 South Montgomery Avenue, Bay Shore, NY 11706"},
       {code:"PS#307",       lat:40.7145541,lon:-73.2211747,address:"600 Ocean Avenue, Islip, NY 11751"},
       {code:"PS#308",       lat:40.7143538,lon:-73.1967512,address:"57 The Helm, East Islip, NY 11730"},
-      {code:"PS#309",       lat:40.6618005,lon:-73.4190788,address:"219 Richmond Ave, Amityville, NY 11701"},
+      {code:"PS#309",       lat:40.6618005,lon:-73.4190788,address:"219 Richmond Avenue, Amityville, NY 11701"},
       {code:"PS#310",       lat:40.6583148,lon:-73.4003024,address:"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
       {code:"PS#311",       lat:40.7751554,lon:-73.2063197,address:"71 Beech Street, Central Islip, NY 11722"},
-      {code:"PS#312",       lat:40.7872918,lon:-73.2842493,address:"Pilgrim State (20 Sagtikos Pkwy), Brentwood, NY 11717"},
+      {code:"PS#312",       lat:40.7872918,lon:-73.2842493,address:"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
       {code:"PS#313",       lat:40.7786667,lon:-73.1933449,address:"1 Fairlawn Drive, Central Islip, NY 11722"},
       {code:"PS#314",       lat:40.751412,  lon:-73.360911,address:"2 Irving Avenue, Wyandanch, NY 11798"},
       {code:"PS#317-1",     lat:40.8203973,lon:-73.4078002,address:"New York Avenue, South Huntington, NY 11746"},
       {code:"PS#317-2",     lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // ─── Initialize map ─────────────────────────────────────────────────
+    // ─── Initialize map
     const map    = L.map('map').setView([40.730889, -73.284654], 12),
           select = document.getElementById('stationSelect'),
           tempDel= {},
@@ -166,7 +165,7 @@
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // ─── Build markers & dropdown ────────────────────────────────────────
+    // ─── Build markers & dropdown
     stations.forEach((st,i) => {
       const popupHTML = `
         <strong>${st.code}</strong><br>
@@ -176,8 +175,8 @@
         | <a href="#" class="note-btn"        data-idx="${i}">Add/Edit Note</a>
         | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
         | <a href="#" class="undo-note-btn"   data-idx="${i}" style="display:none">Undo Delete</a>
-        <br>
-        <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;"></div>
+        <br><br>
+        <div id="note-display-${i}" style="font-style:italic;color:#555;"></div>
       `;
 
       const m = L.marker([st.lat, st.lon])
@@ -199,7 +198,7 @@
       select.appendChild(opt);
     });
 
-    // ─── Dropdown behavior ────────────────────────────────────────────────
+    // ─── Dropdown behavior
     select.addEventListener('change', () => {
       const i = +select.value;
       if (i >= 0) {
@@ -208,7 +207,7 @@
       }
     });
 
-    // ─── Refresh note text when popup opens ─────────────────────────────
+    // ─── Refresh note on popup open
     map.on('popupopen', async e => {
       const node = e.popup._contentNode;
       const idx  = node.querySelector('.note-btn').dataset.idx;
@@ -222,7 +221,7 @@
       }
     });
 
-    // ─── Delegate note / delete / undo handlers ─────────────────────────
+    // ─── Delegate Add/Edit/Delete/Undo
     document.body.addEventListener('click', async e => {
       if (e.target.matches('.note-btn')) {
         e.preventDefault();
@@ -234,7 +233,6 @@
         const note = prompt(`Note for ${code}:`, cur);
         if (note !== null) {
           await doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
-          // re-display in the open popup:
           const disp = document.getElementById(`note-display-${i}`);
           if (disp) disp.textContent = note;
         }
@@ -269,4 +267,3 @@
   </script>
 </body>
 </html>
-
