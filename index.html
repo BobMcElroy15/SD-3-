@@ -194,31 +194,33 @@
       {code:"PS#317-2",lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Helper: recenter so marker appears centered in visible area
-    function setViewWithOffset(latlng, zoom, offsetX) {
-      const p = map.project(latlng, zoom).subtract([offsetX, 0]);
-      map.setView(map.unproject(p, zoom), zoom);
+    // Expand and fit bounds
+    const southWest = L.latLng(40.63, -73.44);
+    const northEast = L.latLng(40.84, -73.17);
+    const bounds    = L.latLngBounds(southWest, northEast);
+
+    // Center‐with‐offset helper
+    function setViewWithOffset(latlng, zoom, offsetX, animate=true) {
+      const point = map.project(latlng, zoom).subtract([offsetX,0]);
+      const center = map.unproject(point, zoom);
+      map.setView(center, zoom, {
+        animate,
+        duration: 0.8
+      });
     }
 
-    // Initialize map
+    // Init map
     const map = L.map('map');
-
-    // Add tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Bounds & initial fit
-    const sw     = L.latLng(40.65, -73.42),
-          ne     = L.latLng(40.82, -73.19),
-          bounds = L.latLngBounds(sw, ne);
-
     map.setMaxBounds(bounds);
     map.options.minZoom = 5;
     map.options.maxZoom = 17;
-    map.fitBounds(bounds);
+    map.fitBounds(bounds, { animate:true, duration:1.0 });
 
-    // Populate dropdown & markers
+    // Populate markers & dropdown
     const select  = document.getElementById('stationSelect'),
           markers = [],
           tempDel = {};
@@ -234,24 +236,22 @@
           <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;"></div>
         `);
 
-      // Zoom+recenter when clicked
       marker.on('click', () => {
-        setViewWithOffset([st.lat, st.lon], 17, 150);
+        setViewWithOffset([st.lat,st.lon],17,150);
         marker.openPopup();
       });
 
       markers[i] = marker;
 
-      const opt = document.createElement('option');
-      opt.value = i;
-      opt.text  = `${st.code} – ${st.address}`;
-      select.appendChild(opt);
+      const option = document.createElement('option');
+      option.value = i;
+      option.text  = `${st.code} – ${st.address}`;
+      select.appendChild(option);
     });
 
-    // Dropdown handler
     select.addEventListener('change', () => {
       const i = +select.value;
-      setViewWithOffset([stations[i].lat, stations[i].lon], 17, 150);
+      setViewWithOffset([stations[i].lat,stations[i].lon],17,150);
       markers[i].openPopup();
     });
 
@@ -273,7 +273,7 @@
         doc.get().then(d => {
           const cur = d.exists ? d.data().text : '';
           const note = prompt(`Note for ${code}:`, cur);
-          if (note !== null) {
+          if (note!==null) {
             doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
             disp.textContent = note;
             undo.style.display = 'none';
@@ -307,9 +307,8 @@
     });
 
     // Share overlay toggle
-    document.getElementById('shareBtn').onclick   = () => document.getElementById('shareOverlay').style.display = 'flex';
-    document.getElementById('closeShare').onclick = () => document.getElementById('shareOverlay').style.display = 'none';
+    document.getElementById('shareBtn').onclick   = () => document.getElementById('shareOverlay').style.display='flex';
+    document.getElementById('closeShare').onclick = () => document.getElementById('shareOverlay').style.display='none';
   </script>
-
 </body>
 </html>
