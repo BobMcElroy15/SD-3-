@@ -32,11 +32,11 @@
   />
 
   <style>
-    /* ─── Base ───────────────────────────────────────────────────────── */
-    body    { margin:0; padding:0; }
-    #map    { height:100vh; }
+    /* Base */
+    body { margin:0; padding:0; }
+    #map  { height:100vh; }
 
-    /* ─── Seal ───────────────────────────────────────────────────────── */
+    /* Seal */
     #seal {
       position: absolute;
       top: 10px;
@@ -45,47 +45,19 @@
       z-index: 1000;
     }
 
-    /* ─── Leaflet zoom controls right of seal ────────────────────────── */
+    /* Zoom controls under seal */
     .leaflet-control-zoom.leaflet-bar {
-      top: 10px !important;    /* same gutter as the seal */
-      left: 60px !important;   /* seal left (10) + seal width (40) + 10px gap */
+      position: absolute !important;
+      top: 60px !important;
+      left: 10px !important;
       z-index: 1000;
     }
 
-    /* ─── Title ───────────────────────────────────────────────────────── */
-    #title {
-      position: absolute;
-      top: 10px;
-      left: 120px;             /* zoom left (60) + zoom width (~40) + 20px gap */
-      right: 5%;
-      max-width: 400px;
-      z-index: 1000;
-      background: white;
-      padding: 6px;
-      border-radius: 6px;
-      font-size: 18px;
-      font-weight: bold;
-      text-align: center;
-    }
-
-    /* ─── Station dropdown ───────────────────────────────────────────── */
-    #stationSelect {
+    /* Share & Install */
+    #shareBtn {
       position: absolute;
       top: 60px;
-      left: 120px;             /* same as title’s left */
-      width: calc(100% - 130px);
-      max-width: 300px;
-      z-index: 1000;
-      background: white;
-      padding: 6px;
-      border-radius: 6px;
-      font-size: 14px;
-    }
-
-    /* ─── Share + Install buttons ────────────────────────────────────── */
-    #shareBtn, #installBtn {
-      position: absolute;
-      left: 120px;             /* same alignment */
+      left: 60px;
       z-index: 1000;
       background: #0066cc;
       color: #fff;
@@ -95,15 +67,52 @@
       font-size: 14px;
       cursor: pointer;
     }
-    #shareBtn   { top: 100px; }
-    #installBtn { top: 150px; display: none; }
-
-    /* ─── Responsive tweak ───────────────────────────────────────────── */
-    @media(min-width:600px) {
-      /* leave as-is on desktop or add extra gutter here if desired */
+    #installBtn {
+      position: absolute;
+      top: 100px;
+      left: 60px;
+      z-index: 1000;
+      background: #0066cc;
+      color: #fff;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      display: none;
     }
 
-    /* ─── Share overlay ───────────────────────────────────────────────── */
+    /* Title now right of seal */
+    #title {
+      position: absolute;
+      top: 10px;
+      left: 60px !important; /* seal left (10) + seal width (40) + gap */
+      right: 5%;
+      max-width: 400px;
+      background: white;
+      padding: 6px;
+      border-radius: 6px;
+      font-size: 18px;
+      font-weight: bold;
+      text-align: center;
+      z-index: 900;
+    }
+
+    /* Dropdown now right of Share */
+    #stationSelect {
+      position: absolute !important;
+      top: 60px !important;   /* same top as shareBtn */
+      left: 140px !important; /* shareBtn left (60) + shareBtn width (~70) + gap */
+      width: calc(100% - 150px) !important;
+      max-width: 300px;
+      background: white;
+      padding: 6px;
+      border-radius: 6px;
+      font-size: 14px;
+      z-index: 900;
+    }
+
+    /* Share overlay */
     #shareOverlay {
       position: fixed;
       top: 0; left: 0;
@@ -137,18 +146,15 @@
 </head>
 
 <body>
-  <!-- Seal + Title -->
   <img id="seal" src="FlatSeal200px.png" alt="Suffolk County Seal">
-  <div id="title">Sewer District 3 Pump Station Map</div>
-
-  <!-- Controls -->
-  <select id="stationSelect">
-    <option value="">Select Pump Station</option>
-  </select>
   <button id="shareBtn">Share</button>
   <button id="installBtn">Install App</button>
 
-  <!-- QR-Share overlay -->
+  <div id="title">Sewer District 3 Pump Station Map</div>
+  <select id="stationSelect">
+    <option value="">Select Pump Station</option>
+  </select>
+
   <div id="shareOverlay">
     <div id="shareOverlayContent">
       <p>Scan to share:</p>
@@ -157,7 +163,6 @@
     </div>
   </div>
 
-  <!-- Map -->
   <div id="map"></div>
 
   <!-- Leaflet JS -->
@@ -167,7 +172,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <script>
-    // ─── Firebase init ─────────────────────────────────────────────────
+    // Firebase init
     firebase.initializeApp({
       apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain: "sd3ps-map.firebaseapp.com",
@@ -179,7 +184,7 @@
     });
     const db = firebase.firestore();
 
-    // ─── PWA install prompt ─────────────────────────────────────────────
+    // PWA install prompt
     let deferredPrompt;
     const installBtn = document.getElementById('installBtn');
     window.addEventListener('beforeinstallprompt', e => {
@@ -194,68 +199,61 @@
       deferredPrompt = null;
     });
 
-    // ─── Service worker ─────────────────────────────────────────────────
+    // Register SW
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // ─── Stations + Map setup ────────────────────────────────────────────
+    // Stations & map logic
     const stations = [
-      {code:"PS#300 AWXIA",lat:40.7227675,lon:-73.2307527,address:"50 South Saxon Avenue, Bay Shore, NY 11706"},
-      /* … all your other stations … */
-      {code:"PS#317-2", lat:40.7868774,lon:-73.406908, address:"270 McGovern Drive, Melville, NY 11747"}
+      /* … your station array … */
+      {code:"PS#317-2",lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    const map = L.map('map').setView([40.730889, -73.284654], 12);
+    const map = L.map('map').setView([40.730889,-73.284654],12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    const select  = document.getElementById('stationSelect');
-    const markers = [];
-    const tempDel = {};
+    const select = document.getElementById('stationSelect'),
+          markers = [], tempDel={};
 
     stations.forEach((st,i) => {
-      const popup = `
-        <strong>${st.code}</strong><br>
-        ${st.address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}"
-           target="_blank">Navigate</a>
+      markers[i] = L.marker([st.lat,st.lon]).addTo(map).bindPopup(`
+        <strong>${st.code}</strong><br>${st.address}<br>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
         | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
         | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
-        | <a href="#" class="undo-note-btn" data-idx="${i}"
-             style="display:none">Undo Delete</a>
-        <div id="note-display-${i}"
-             style="margin-top:6px;color:#555;font-style:italic;"></div>
-      `;
-      markers[i] = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popup);
+        | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
+        <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;"></div>
+      `);
       const o = document.createElement('option');
-      o.value = i; o.text = `${st.code} – ${st.address}`;
+      o.value=i; o.text=`${st.code} – ${st.address}`;
       select.appendChild(o);
     });
 
     select.addEventListener('change', () => {
       const i = +select.value;
-      map.setView([stations[i].lat, stations[i].lon], 17);
+      map.setView([stations[i].lat,stations[i].lon],17);
       markers[i].openPopup();
     });
 
     map.on('popupopen', e => {
-      const c    = e.popup._contentNode;
-      const idx  = c.querySelector('.note-btn').dataset.idx;
-      const code = stations[idx].code;
-      const doc  = db.collection('notes').doc(code);
-      const disp = c.querySelector(`#note-display-${idx}`);
-      const add  = c.querySelector('.note-btn');
-      const del  = c.querySelector('.delete-note-btn');
-      const undo = c.querySelector('.undo-note-btn');
+      const c=e.popup._contentNode,
+            idx=c.querySelector('.note-btn').dataset.idx,
+            code=stations[idx].code,
+            doc=db.collection('notes').doc(code),
+            disp=c.querySelector(`#note-display-${idx}`),
+            add=c.querySelector('.note-btn'),
+            del=c.querySelector('.delete-note-btn'),
+            undo=c.querySelector('.undo-note-btn');
 
-      doc.get().then(d => disp.textContent = d.exists ? d.data().text : '');
+      doc.get().then(d=>disp.textContent=d.exists?d.data().text:'');
 
       add.onclick = ev => {
         ev.preventDefault();
         doc.get().then(d => {
-          const cur = d.exists ? d.data().text : '';
+          const cur = d.exists?d.data().text:'';
           const note = prompt(`Note for ${code}:`, cur);
           if (note!==null) {
             doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
@@ -268,29 +266,28 @@
       del.onclick = ev => {
         ev.preventDefault();
         doc.get().then(d => {
-          tempDel[code] = d.exists ? d.data().text : '';
+          tempDel[code]=d.exists?d.data().text:'';
           return doc.delete();
-        }).then(() => {
-          disp.textContent = '';
-          undo.style.display = 'inline';
+        }).then(()=>{
+          disp.textContent='';
+          undo.style.display='inline';
         });
       };
 
       undo.onclick = ev => {
         ev.preventDefault();
-        const prev = tempDel[code];
-        if (prev!==undefined) {
-          doc.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() })
-             .then(() => {
-               disp.textContent = prev;
-               undo.style.display = 'none';
-               delete tempDel[code];
-             });
+        if (tempDel[code]!==undefined) {
+          doc.set({ text: tempDel[code], updated: firebase.firestore.FieldValue.serverTimestamp() })
+            .then(()=>{
+              disp.textContent=tempDel[code];
+              undo.style.display='none';
+              delete tempDel[code];
+            });
         }
       };
     });
 
-    // ─── Share overlay toggle ───────────────────────────────────────────
+    // Share overlay toggle
     document.getElementById('shareBtn').onclick   = ()=>document.getElementById('shareOverlay').style.display='flex';
     document.getElementById('closeShare').onclick = ()=>document.getElementById('shareOverlay').style.display='none';
   </script>
