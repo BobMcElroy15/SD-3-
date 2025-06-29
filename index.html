@@ -34,19 +34,6 @@
       background:#fff; padding:6px; border-radius:6px;
       font-size:14px; z-index:900;
     }
-    #shareOverlay {
-      position:fixed; top:0; left:0; width:100%; height:100%;
-      background:rgba(0,0,0,0.7); display:none;
-      align-items:center; justify-content:center; z-index:2000;
-    }
-    #shareOverlayContent {
-      background:#fff; padding:20px; border-radius:8px; text-align:center;
-    }
-    #shareOverlayContent img { max-width:80vw; }
-    #closeShare {
-      margin-top:10px; padding:8px 12px;
-      background:#333; color:#fff; border:none; border-radius:4px; cursor:pointer;
-    }
   </style>
 </head>
 <body>
@@ -58,14 +45,6 @@
   <select id="stationSelect">
     <option value="">Select Pump Station</option>
   </select>
-
-  <div id="shareOverlay">
-    <div id="shareOverlayContent">
-      <p>Scan to share:</p>
-      <img src="qr-code.png" alt="QR code"><br>
-      <button id="closeShare">Close</button>
-    </div>
-  </div>
 
   <div id="map"></div>
 
@@ -80,23 +59,10 @@
     });
     const db = firebase.firestore();
 
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault(); deferredPrompt = e;
-      installBtn.style.display = 'block';
-    });
-    installBtn.addEventListener('click', async () => {
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      installBtn.style.display = 'none';
-    });
-
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // ← full list restored here ↓
     const stations = [
       {code:"PS#300 AWXIA",lat:40.7227675,lon:-73.2307527,address:"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {code:"PS#301",lat:40.6930405,lon:-73.2790417,address:"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -108,115 +74,47 @@
       {code:"PS#307",lat:40.7145541,lon:-73.2211747,address:"600 Ocean Avenue, Islip, NY 11751"},
       {code:"PS#308",lat:40.7143538,lon:-73.1967512,address:"57 The Helm, East Islip, NY 11730"},
       {code:"PS#309",lat:40.6618005,lon:-73.4190788,address:"219 Richmond Avenue, Amityville, NY 11701"},
-      {code:"PS#310",lat:40.6583148,lon:-73.4003024,address:"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
+      {code:"PS#310",lat:40.6583148,lon:-73.4003024,address:"Jefferson Rd, Copiague, Amityville, NY 11701"},
       {code:"PS#311",lat:40.7751554,lon:-73.2063197,address:"71 Beech Street, Central Islip, NY 11722"},
-      {code:"PS#312",lat:40.7872918,lon:-73.2842493,address:"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
+      {code:"PS#312",lat:40.7872918,lon:-73.2842493,address:"Pilgrim State, Brentwood, NY 11717"},
       {code:"PS#313",lat:40.7786667,lon:-73.1933449,address:"1 Fairlawn Drive, Central Islip, NY 11722"},
       {code:"PS#314",lat:40.751412,lon:-73.360911,address:"2 Irving Avenue, Wyandanch, NY 11798"},
       {code:"PS#317-1",lat:40.8203973,lon:-73.4078002,address:"New York Avenue, South Huntington, NY 11746"},
       {code:"PS#317-2",lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    const map    = L.map('map').setView([40.730889, -73.284654], 12),
-          select = document.getElementById('stationSelect'),
-          tempDel= {},
-          markers=[];
+    const map = L.map('map').setView([40.730889, -73.284654], 12),
+          select = document.getElementById('stationSelect');
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
     stations.forEach((st,i) => {
-      const html = `
-        <strong>${st.code}</strong><br>
-        ${st.address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}"
-           target="_blank">Navigate</a>
-        | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
-        | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
-        | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
-        <br>
-        <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;"></div>
-      `;
-      const m = L.marker([st.lat, st.lon]).addTo(map).bindPopup(html);
-      m.on('click', () => {
-        map.once('moveend', () => m.openPopup());
-        map.setView([st.lat, st.lon], 17, { animate:true, duration:0.8 });
+      const m = L.marker([st.lat, st.lon]).addTo(map);
+      m.on('click', async () => {
+        const snap = await db.collection('notes').doc(st.code).get();
+        const note = snap.exists ? snap.data().text : '';
+        m.bindPopup(`
+          <strong>${st.code}</strong><br>${st.address}<br>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a> |
+          <a href="#" onclick="addNote('${st.code}')">Add/Edit Note</a><br>
+          <div style="margin-top:6px;font-style:italic;color:#555;">${note}</div>
+        `).openPopup();
       });
-      markers.push(m);
-      const opt = document.createElement('option');
-      opt.value = i; opt.text = `${st.code} – ${st.address}`;
-      select.appendChild(opt);
+      const opt = new Option(`${st.code} – ${st.address}`, i);
+      select.add(opt);
     });
 
-    select.addEventListener('change', () => {
-      const i = +select.value;
-      if (i>=0) {
-        map.once('moveend', () => markers[i].openPopup());
-        map.setView([stations[i].lat, stations[i].lon], 17, { animate:true, duration:0.8 });
-      }
-    });
+    select.onchange = ()=> map.setView([stations[select.value].lat,stations[select.value].lon],17);
 
-    // refresh note display on every popup open
-    map.on('popupopen', async e => {
-      const node = e.popup._contentNode;
-      const idx  = node.querySelector('.note-btn').dataset.idx;
-      const code = stations[idx].code;
-      const disp = node.querySelector(`#note-display-${idx}`);
-      try {
-        const snap = await db.collection('notes').doc(code).get();
-        disp.textContent = snap.exists ? snap.data().text : '';
-      } catch(err) {
-        console.error(err);
-      }
-    });
-
-    // delegate add/edit/delete/undo
-    document.body.addEventListener('click', async e => {
-      if (e.target.matches('.note-btn')) {
-        e.preventDefault();
-        const i = e.target.dataset.idx;
-        const code = stations[i].code;
-        const doc  = db.collection('notes').doc(code);
-        const snap = await doc.get();
-        const cur  = snap.exists ? snap.data().text : '';
-        const note = prompt(`Note for ${code}:`, cur);
-        if (note!==null) {
-          await doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
-          const disp = document.getElementById(`note-display-${i}`);
-          if (disp) disp.textContent = note;
-        }
-      }
-      if (e.target.matches('.delete-note-btn')) {
-        e.preventDefault();
-        const i = e.target.dataset.idx;
-        const code = stations[i].code;
-        const doc  = db.collection('notes').doc(code);
-        const snap = await doc.get();
-        tempDel[code] = snap.exists ? snap.data().text : '';
-        await doc.delete();
-        const disp = document.getElementById(`note-display-${i}`);
-        if (disp) disp.textContent = '';
-        document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display='inline';
-      }
-      if (e.target.matches('.undo-note-btn')) {
-        e.preventDefault();
-        const i = e.target.dataset.idx;
-        const code = stations[i].code;
-        const doc  = db.collection('notes').doc(code);
-        const prev = tempDel[code];
-        if (prev!==undefined) {
-          await doc.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() });
-          const disp = document.getElementById(`note-display-${i}`);
-          if (disp) disp.textContent = prev;
-          e.target.style.display='none';
-          delete tempDel[code];
-        }
-      }
-    });
-
-    shareBtn.onclick   = ()=> shareOverlay.style.display='flex';
-    closeShare.onclick = ()=> shareOverlay.style.display='none';
+    window.addNote = async code => {
+      const doc = db.collection('notes').doc(code);
+      const snap = await doc.get();
+      const current = snap.exists ? snap.data().text : '';
+      const note = prompt(`Note for ${code}:`, current);
+      if (note!==null) await doc.set({text:note,updated:firebase.firestore.FieldValue.serverTimestamp()});
+    };
   </script>
 </body>
 </html>
