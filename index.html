@@ -35,19 +35,6 @@
     body { margin:0; padding:0; }
     #map  { height:100vh; }
 
-/* ─── Zoom below your buttons on desktop ───────── */
-@media (min-width: 600px) {
-  .leaflet-control-zoom.leaflet-bar {
-    top: 180px !important;
-  }
-}
-/* ─── Zoom a bit higher on small (mobile) screens ───────── */
-@media (max-width: 599px) {
-  .leaflet-control-zoom.leaflet-bar {
-    top: 140px !important;
-  }
-}
-
     /* ─── Seal ─────────────────────────────────────────────────────────── */
     #seal {
       position: absolute;
@@ -141,9 +128,21 @@
       cursor: pointer;
     }
 
-    /* ─── Push zoom‐controls down under the seal ───────────────────────── */
+    /* ─── Zoom controls ───────────────────────────────────────────────── */
+    /* Default push below the seal & dropdown */
     .leaflet-control-zoom.leaflet-bar {
-      top: 60px !important;
+      top: 100px !important;
+    }
+    /* Fine-tune desktop vs mobile */
+    @media (min-width: 600px) {
+      .leaflet-control-zoom.leaflet-bar {
+        top: 180px !important;
+      }
+    }
+    @media (max-width: 599px) {
+      .leaflet-control-zoom.leaflet-bar {
+        top: 140px !important;
+      }
     }
   </style>
 </head>
