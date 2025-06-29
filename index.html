@@ -197,6 +197,7 @@
     // Initialize map WITHOUT default zoom
     const map = L.map('map');
 
+    // Add tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
@@ -215,17 +216,29 @@
     const select = document.getElementById('stationSelect'),
           markers = [],
           tempDel = {};
-    stations.forEach((st,i) => {
-      markers[i] = L.marker([st.lat, st.lon]).addTo(map).bindPopup(`
-        <strong>${st.code}</strong><br>${st.address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
-        | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
-        | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
-        | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
-        <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;"></div>
-      `);
+
+    stations.forEach((st, i) => {
+      const marker = L.marker([st.lat, st.lon]).addTo(map)
+        .bindPopup(`
+          <strong>${st.code}</strong><br>${st.address}<br>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
+          | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
+          | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
+          | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
+          <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;"></div>
+        `);
+
+      // zoom in when marker is clicked
+      marker.on('click', () => {
+        map.setView([st.lat, st.lon], 17);
+        marker.openPopup();
+      });
+
+      markers[i] = marker;
+
       const o = document.createElement('option');
-      o.value = i; o.text = `${st.code} – ${st.address}`;
+      o.value = i;
+      o.text  = `${st.code} – ${st.address}`;
       select.appendChild(o);
     });
 
@@ -236,7 +249,7 @@
       markers[i].openPopup();
     });
 
-    // Notes & Share logic (unchanged)
+    // Notes logic
     map.on('popupopen', e => {
       const c    = e.popup._contentNode,
             idx  = c.querySelector('.note-btn').dataset.idx,
@@ -287,6 +300,7 @@
       };
     });
 
+    // Share overlay toggle
     document.getElementById('shareBtn').onclick   = () => document.getElementById('shareOverlay').style.display = 'flex';
     document.getElementById('closeShare').onclick = () => document.getElementById('shareOverlay').style.display = 'none';
   </script>
@@ -299,6 +313,5 @@
         .catch(console.error);
     }
   </script>
-
 </body>
 </html>
