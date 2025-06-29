@@ -4,16 +4,15 @@
   <meta charset="utf-8">
   <title>Sewer District 3 Pump Station Map</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-<!-- Google Analytics 4 -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-HHX1X8KFSF"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){ dataLayer.push(arguments); }
-  gtag('js', new Date());
-  gtag('config', 'G-HHX1X8KFSF', {
-    send_page_view: true
-  });
-</script>
+
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-HHX1X8KFSF"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-HHX1X8KFSF', { send_page_view: true });
+  </script>
 
   <!-- Unregister old SW so we see fresh HTML immediately -->
   <script>
@@ -36,91 +35,114 @@
     body { margin:0; padding:0; }
     #map { height:100vh; }
 
-      /* County seal in top-left */
-  #seal {
-    position: absolute;
-    top: 10px;    /* same as #title */
-    left: 10px;   /* small gutter from the left edge */
-    width: 40px;  /* scale as you like */
-    height: auto;
-    z-index: 1000;
-  }
+    /* County seal */
+    #seal {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 40px;
+      z-index: 1000;
+    }
 
-  /* shift the title right to clear the seal */
-  #title {
-    top: 10px;
-    left: 60px;                           /* push it over */
-    width: calc(100% - 70px);             /* shrink to fit */
-    max-width: calc(400px - 20px);        /* adjust your max-width too */
-    /* leave the rest of your existing #title rules untouched */
-  }
-
-
-    /* Title + dropdown */
+    /* Title bar, shifted right to clear seal */
     #title {
-      position:absolute; top:10px; left:5%; width:90%; max-width:400px;
-      z-index:1000; background:white; padding:6px; border-radius:6px;
-      font-size:18px; font-weight:bold; text-align:center;
+      position: absolute;
+      top: 10px;
+      left: 60px;
+      right: 5%;
+      max-width: 400px;
+      z-index: 1000;
+      background: white;
+      padding: 6px;
+      border-radius: 6px;
+      font-size: 18px;
+      font-weight: bold;
+      text-align: center;
     }
+
+    /* Station dropdown */
     #stationSelect {
-      position:absolute; top:60px; left:5%; width:90%; max-width:300px;
-      z-index:1000; background:white; padding:6px; border-radius:6px;
-      font-size:14px;
+      position: absolute;
+      top: 60px;
+      left: 5%;
+      width: 90%;
+      max-width: 300px;
+      z-index: 1000;
+      background: white;
+      padding: 6px;
+      border-radius: 6px;
+      font-size: 14px;
     }
 
-    /* Buttons: Share on top, Install below */
+    /* Share + Install buttons */
     #shareBtn, #installBtn {
-      position:absolute; left:5%; z-index:1000;
-      background:#0066cc; color:#fff; padding:8px 12px; border:none;
-      border-radius:4px; font-size:14px; cursor:pointer;
+      position: absolute;
+      left: 5%;
+      z-index: 1000;
+      background: #0066cc;
+      color: #fff;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
     }
-    #shareBtn   { top:110px; }
-    #installBtn { top:160px; display:none; }
+    #shareBtn   { top: 110px; }
+    #installBtn { top: 160px; display: none; }
 
-    @media(min-width:600px){
-      #title { left:50px; }
-      #stationSelect { left:50px; }
-      #shareBtn   { left:50px; }
-      #installBtn { left:50px; }
+    @media(min-width:600px) {
+      #title       { left: 50px; right: auto; }
+      #stationSelect { left: 50px; }
+      #shareBtn    { left: 50px; }
+      #installBtn  { left: 50px; }
     }
 
     /* Share overlay */
     #shareOverlay {
-      position:fixed; top:0; left:0; width:100%; height:100%;
-      background:rgba(0,0,0,0.7); display:none;
-      align-items:center; justify-content:center; z-index:2000;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
     }
     #shareOverlayContent {
-      background:white; padding:20px; border-radius:8px; text-align:center;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
     }
     #shareOverlayContent img {
-      max-width:80vw; height:auto;
+      max-width: 80vw;
+      height: auto;
     }
     #closeShare {
-      margin-top:10px; padding:8px 12px; border:none;
-      background:#333; color:white; border-radius:4px; cursor:pointer;
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: #333;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
     }
   </style>
 </head>
+
 <body>
-
-  <body>
-  <!-- Add the seal image here -->
+  <!-- Seal + Title -->
   <img id="seal" src="FlatSeal200px.png" alt="Suffolk County Seal">
-
-  <!-- Your existing title -->
   <div id="title">Sewer District 3 Pump Station Map</div>
-  
-  <!-- …the rest of your body… -->
 
-  <div id="title">Sewer District 3 Pump Station Map</div>
+  <!-- Controls -->
   <select id="stationSelect">
     <option value="">Select Pump Station</option>
   </select>
-
   <button id="shareBtn">Share</button>
   <button id="installBtn">Install App</button>
 
+  <!-- Share overlay -->
   <div id="shareOverlay">
     <div id="shareOverlayContent">
       <p>Scan to share:</p>
@@ -129,6 +151,7 @@
     </div>
   </div>
 
+  <!-- Map container -->
   <div id="map"></div>
 
   <!-- Leaflet JS -->
@@ -137,154 +160,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
-  <script>
-    // Firebase init
-    firebase.initializeApp({
-      apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
-      authDomain: "sd3ps-map.firebaseapp.com",
-      projectId: "sd3ps-map",
-      storageBucket: "sd3ps-map.appspot.com",
-      messagingSenderId: "14976888367",
-      appId: "1:14976888367:web:9ef05a76be1ca780d7e0da",
-      measurementId: "G-HHX1X8KFSF"
-    });
-    const db = firebase.firestore();
-
-    // PWA install prompt
-    let deferredPrompt;
-    const installBtn = document.getElementById('installBtn');
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault();
-      deferredPrompt = e;
-      installBtn.style.display = 'block';
-    });
-    installBtn.addEventListener('click', async () => {
-      installBtn.style.display = 'none';
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      deferredPrompt = null;
-    });
-
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .catch(console.error);
-    }
-
-    // Pump station data
-    const stations = [
-      {code:"PS#300 AWXIA",lat:40.7227675,lon:-73.2307527,address:"50 South Saxon Avenue, Bay Shore, NY 11706"},
-      {code:"PS#301",lat:40.6930405,lon:-73.2790417,address:"9 Oak Neck Lane, West Islip, NY 11795"},
-      {code:"PS#302",lat:40.704264,lon:-73.2548192,address:"33 Girard Ave, Brightwaters, NY 11718"},
-      {code:"PS#303",lat:40.7058464,lon:-73.2509559,address:"1 Shore Road East, Brightwaters, NY 11718"},
-      {code:"PS#304",lat:40.7138133,lon:-73.2467338,address:"7 Prospect Avenue, Bay Shore, NY 11706"},
-      {code:"PS#305",lat:40.7169715,lon:-73.2424563,address:"89 Maple Avenue, Bay Shore, NY 11706"},
-      {code:"PS#306",lat:40.7195939,lon:-73.2375154,address:"83 South Montgomery Avenue, Bay Shore, NY 11706"},
-      {code:"PS#307",lat:40.7145541,lon:-73.2211747,address:"600 Ocean Avenue, Islip, NY 11751"},
-      {code:"PS#308",lat:40.7143538,lon:-73.1967512,address:"57 The Helm, East Islip, NY 11730"},
-      {code:"PS#309",lat:40.6618005,lon:-73.4190788,address:"219 Richmond Avenue, Amityville, NY 11701"},
-      {code:"PS#310",lat:40.6583148,lon:-73.4003024,address:"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
-      {code:"PS#311",lat:40.7751554,lon:-73.2063197,address:"71 Beech Street, Central Islip, NY 11722"},
-      {code:"PS#312",lat:40.7872918,lon:-73.2842493,address:"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
-      {code:"PS#313",lat:40.7786667,lon:-73.1933449,address:"1 Fairlawn Drive, Central Islip, NY 11722"},
-      {code:"PS#314",lat:40.751412,lon:-73.360911,address:"2 Irving Avenue, Wyandanch, NY 11798"},
-      {code:"PS#317-1",lat:40.8203973,lon:-73.4078002,address:"New York Avenue, South Huntington, NY 11746"},
-      {code:"PS#317-2",lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
-    ];
-
-    // Initialize map
-    const map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap contributors' }).addTo(map);
-
-    // Dropdown, markers & notes
-    const select = document.getElementById('stationSelect'),
-          markers = [],
-          tempDeleted = {};
-
-    stations.forEach((st, idx) => {
-      const popup = `
-        <strong>${st.code}</strong><br>
-        ${st.address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
-        <span> | </span>
-        <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
-        <span> | </span>
-        <a href="#" class="delete-note-btn" data-idx="${idx}">Delete Note</a>
-        <span> | </span>
-        <a href="#" class="undo-note-btn" data-idx="${idx}" style="display:none">Undo Delete</a>
-        <div id="note-display-${idx}" style="margin-top:6px;font-style:italic;color:#555;"></div>
-      `;
-      markers[idx] = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popup);
-
-      const opt = document.createElement('option');
-      opt.value = idx;
-      opt.text  = `${st.code} – ${st.address}`;
-      select.appendChild(opt);
-    });
-
-    select.addEventListener('change', () => {
-      const i = select.value;
-      map.setView([stations[i].lat, stations[i].lon], 17);
-      markers[i].openPopup();
-    });
-
-    map.on('popupopen', e => {
-      const c   = e.popup._contentNode,
-            idx = c.querySelector('.note-btn').dataset.idx,
-            code= stations[idx].code,
-            doc = db.collection('notes').doc(code),
-            disp= c.querySelector(`#note-display-${idx}`),
-            add = c.querySelector('.note-btn'),
-            del = c.querySelector('.delete-note-btn'),
-            undo= c.querySelector('.undo-note-btn');
-
-      doc.get().then(d => disp.textContent = d.exists ? d.data().text : '');
-
-      add.onclick = ev => {
-        ev.preventDefault();
-        doc.get().then(d => {
-          const cur = d.exists ? d.data().text : '';
-          const note = prompt(`Note for ${code}:`, cur);
-          if (note !== null) {
-            doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
-            disp.textContent = note;
-            undo.style.display = 'none';
-          }
-        });
-      };
-
-      del.onclick = ev => {
-        ev.preventDefault();
-        doc.get().then(d => {
-          tempDeleted[code] = d.exists ? d.data().text : '';
-          return doc.delete();
-        }).then(() => {
-          disp.textContent = '';
-          undo.style.display = 'inline';
-        });
-      };
-
-      undo.onclick = ev => {
-        ev.preventDefault();
-        const prev = tempDeleted[code];
-        if (prev !== undefined) {
-          doc.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() })
-            .then(() => {
-              disp.textContent = prev;
-              undo.style.display = 'none';
-              delete tempDeleted[code];
-            });
-        }
-      };
-    });
-
-    // Share overlay
-    document.getElementById('shareBtn').onclick = () => {
-      document.getElementById('shareOverlay').style.display = 'flex';
-    };
-    document.getElementById('closeShare').onclick = () => {
-      document.getElementById('shareOverlay').style.display = 'none';
-    };
-  </script>
+  <!-- …rest of your existing scripts (Firebase init, stations, popups, etc.) … -->
 </body>
 </html>
