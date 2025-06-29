@@ -4,27 +4,35 @@
   <meta charset="utf-8">
   <title>Sewer District 3 Pump Station Map</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <!-- PWA manifest & theme -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0066cc">
+
+  <!-- Leaflet CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
+
   <style>
     body { margin:0; padding:0; }
     #map  { height:100vh; }
 
     /* Seal */
-    #seal { position:absolute; top:10px; left:10px; width:70px; z-index:1000; }
+    #seal {
+      position:absolute; top:10px; left:10px;
+      width:70px; z-index:1000;
+    }
 
-    /* Zoom controls below seal */
+    /* Leaflet zoom controls, just under the seal */
     .leaflet-control-zoom.leaflet-bar {
       position:absolute!important;
       top:80px!important; left:10px!important;
       z-index:1000;
     }
 
-    /* Share & Install */
+    /* Share & Install buttons */
     #shareBtn, #installBtn {
       position:absolute; left:80px; z-index:1000;
       background:#0066cc; color:#fff;
@@ -34,7 +42,7 @@
     #shareBtn   { top:85px; }
     #installBtn { top:120px; display:none; }
 
-    /* Title */
+    /* Title bar */
     #title {
       position:absolute; top:10px; left:80px; right:5%;
       background:#fff; padding:6px; border-radius:6px;
@@ -51,11 +59,12 @@
       font-size:14px; z-index:900;
     }
 
-    /* Share overlay */
+    /* Share Overlay */
     #shareOverlay {
       position:fixed; top:0; left:0; width:100%; height:100%;
       background:rgba(0,0,0,0.7); display:none;
-      align-items:center; justify-content:center; z-index:2000;
+      align-items:center; justify-content:center;
+      z-index:2000;
     }
     #shareOverlayContent {
       background:#fff; padding:20px; border-radius:8px;
@@ -64,21 +73,24 @@
     #shareOverlayContent img { max-width:80vw; }
     #closeShare {
       margin-top:10px; padding:8px 12px;
-      background:#333; color:#fff; border:none; border-radius:4px;
-      cursor:pointer;
+      background:#333; color:#fff; border:none;
+      border-radius:4px; cursor:pointer;
     }
   </style>
 </head>
 <body>
+  <!-- Seal + Buttons -->
   <img id="seal" src="FlatSeal200px.png" alt="County Seal">
   <button id="shareBtn">Share</button>
   <button id="installBtn">Install App</button>
 
+  <!-- Title + Dropdown -->
   <div id="title">Sewer District 3 Pump Station Map</div>
   <select id="stationSelect">
     <option value="">Select Pump Station</option>
   </select>
 
+  <!-- Share Overlay -->
   <div id="shareOverlay">
     <div id="shareOverlayContent">
       <p>Scan to share:</p>
@@ -87,12 +99,14 @@
     </div>
   </div>
 
+  <!-- Map -->
   <div id="map"></div>
 
-  <!-- Leaflet & Firebase -->
+  <!-- Leaflet & Firebase SDKs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
   <script>
     // ─── Firebase init
     firebase.initializeApp({
@@ -102,10 +116,11 @@
     });
     const db = firebase.firestore();
 
-    // ─── Grab buttons
+    // ─── Grab buttons + inputs
     const installBtn = document.getElementById('installBtn'),
           shareBtn   = document.getElementById('shareBtn'),
-          closeShare = document.getElementById('closeShare');
+          closeShare = document.getElementById('closeShare'),
+          stationSelect = document.getElementById('stationSelect');
 
     // ─── PWA install prompt
     let deferredPrompt;
@@ -129,61 +144,64 @@
       document.getElementById('shareOverlay').style.display = 'none';
     });
 
-    // ─── Service Worker (install only)
+    // ─── Service worker (install only)
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // ─── Pump station data
+    // ─── All pump stations
     const stations = [
       {code:"PS#300 AWXIA",lat:40.7227675,lon:-73.2307527,address:"50 South Saxon Avenue, Bay Shore, NY 11706"},
-      {code:"PS#301",       lat:40.6930405,lon:-73.2790417,address:"9 Oak Neck Lane, West Islip, NY 11795"},
-      {code:"PS#302",       lat:40.704264,  lon:-73.2548192,address:"33 Girard Ave, Brightwaters, NY 11718"},
-      {code:"PS#303",       lat:40.7058464,lon:-73.2509559,address:"1 Shore Road East, Brightwaters, NY 11718"},
-      {code:"PS#304",       lat:40.7138133,lon:-73.2467338,address:"7 Prospect Avenue, Bay Shore, NY 11706"},
-      {code:"PS#305",       lat:40.7169715,lon:-73.2424563,address:"89 Maple Avenue, Bay Shore, NY 11706"},
-      {code:"PS#306",       lat:40.7195939,lon:-73.2375154,address:"83 South Montgomery Avenue, Bay Shore, NY 11706"},
-      {code:"PS#307",       lat:40.7145541,lon:-73.2211747,address:"600 Ocean Avenue, Islip, NY 11751"},
-      {code:"PS#308",       lat:40.7143538,lon:-73.1967512,address:"57 The Helm, East Islip, NY 11730"},
-      {code:"PS#309",       lat:40.6618005,lon:-73.4190788,address:"219 Richmond Avenue, Amityville, NY 11701"},
-      {code:"PS#310",       lat:40.6583148,lon:-73.4003024,address:"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
-      {code:"PS#311",       lat:40.7751554,lon:-73.2063197,address:"71 Beech Street, Central Islip, NY 11722"},
-      {code:"PS#312",       lat:40.7872918,lon:-73.2842493,address:"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
-      {code:"PS#313",       lat:40.7786667,lon:-73.1933449,address:"1 Fairlawn Drive, Central Islip, NY 11722"},
-      {code:"PS#314",       lat:40.751412,  lon:-73.360911,address:"2 Irving Avenue, Wyandanch, NY 11798"},
-      {code:"PS#317-1",     lat:40.8203973,lon:-73.4078002,address:"New York Avenue, South Huntington, NY 11746"},
-      {code:"PS#317-2",     lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
+      {code:"PS#301",lat:40.6930405,lon:-73.2790417,address:"9 Oak Neck Lane, West Islip, NY 11795"},
+      {code:"PS#302",lat:40.704264,lon:-73.2548192,address:"33 Girard Ave, Brightwaters, NY 11718"},
+      {code:"PS#303",lat:40.7058464,lon:-73.2509559,address:"1 Shore Road East, Brightwaters, NY 11718"},
+      {code:"PS#304",lat:40.7138133,lon:-73.2467338,address:"7 Prospect Avenue, Bay Shore, NY 11706"},
+      {code:"PS#305",lat:40.7169715,lon:-73.2424563,address:"89 Maple Avenue, Bay Shore, NY 11706"},
+      {code:"PS#306",lat:40.7195939,lon:-73.2375154,address:"83 South Montgomery Avenue, Bay Shore, NY 11706"},
+      {code:"PS#307",lat:40.7145541,lon:-73.2211747,address:"600 Ocean Avenue, Islip, NY 11751"},
+      {code:"PS#308",lat:40.7143538,lon:-73.1967512,address:"57 The Helm, East Islip, NY 11730"},
+      {code:"PS#309",lat:40.6618005,lon:-73.4190788,address:"219 Richmond Avenue, Amityville, NY 11701"},
+      {code:"PS#310",lat:40.6583148,lon:-73.4003024,address:"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
+      {code:"PS#311",lat:40.7751554,lon:-73.2063197,address:"71 Beech Street, Central Islip, NY 11722"},
+      {code:"PS#312",lat:40.7872918,lon:-73.2842493,address:"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
+      {code:"PS#313",lat:40.7786667,lon:-73.1933449,address:"1 Fairlawn Drive, Central Islip, NY 11722"},
+      {code:"PS#314",lat:40.751412,lon:-73.360911,address:"2 Irving Avenue, Wyandanch, NY 11798"},
+      {code:"PS#317-1",lat:40.8203973,lon:-73.4078002,address:"New York Avenue, South Huntington, NY 11746"},
+      {code:"PS#317-2",lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // ─── Initialize map
-    const map    = L.map('map').setView([40.730889, -73.284654], 12),
-          select = document.getElementById('stationSelect'),
-          tempDel= {},
-          markers=[];
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    // ─── Leaflet map
+    const map = L.map('map').setView([40.730889, -73.284654], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // ─── Build markers & dropdown
+    // ─── Keep track of markers
+    const markers = [];
+    const tempDel  = {};
+
+    // ─── Create each marker + dropdown option
     stations.forEach((st,i) => {
+      // Popup HTML: note the <div id="note-display-i">
       const popupHTML = `
         <strong>${st.code}</strong><br>
         ${st.address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}"
-           target="_blank">Navigate</a>
-        | <a href="#" class="note-btn"        data-idx="${i}">Add/Edit Note</a>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">
+          Navigate
+        </a>
+        | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
         | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
-        | <a href="#" class="undo-note-btn"   data-idx="${i}" style="display:none">Undo Delete</a>
-        <br><br>
-        <div id="note-display-${i}" style="font-style:italic;color:#555;"></div>
+        | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
+        <br>
+        <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;"></div>
       `;
 
+      // Add marker & bind
       const m = L.marker([st.lat, st.lon])
         .addTo(map)
         .bindPopup(popupHTML);
 
-      // pan/zoom then re-open popup
+      // On click → pan/zoom & re-open popup
       m.on('click', () => {
         map.once('moveend', () => m.openPopup());
         map.setView([st.lat, st.lon], 17, { animate:true, duration:0.8 });
@@ -191,23 +209,25 @@
 
       markers.push(m);
 
-      // dropdown option
+      // Add to dropdown
       const opt = document.createElement('option');
       opt.value = i;
       opt.text  = `${st.code} – ${st.address}`;
-      select.appendChild(opt);
+      stationSelect.appendChild(opt);
     });
 
-    // ─── Dropdown behavior
-    select.addEventListener('change', () => {
-      const i = +select.value;
+    // ─── Dropdown selection: same pan/zoom + popup
+    stationSelect.addEventListener('change', () => {
+      const i = +stationSelect.value;
       if (i >= 0) {
         map.once('moveend', () => markers[i].openPopup());
-        map.setView([stations[i].lat, stations[i].lon], 17, { animate:true, duration:0.8 });
+        map.setView([stations[i].lat, stations[i].lon], 17, {
+          animate:true, duration:0.8
+        });
       }
     });
 
-    // ─── Refresh note on popup open
+    // ─── Every time ANY popup opens, fetch its note & inject into the div
     map.on('popupopen', async e => {
       const node = e.popup._contentNode;
       const idx  = node.querySelector('.note-btn').dataset.idx;
@@ -217,12 +237,13 @@
         const snap = await db.collection('notes').doc(code).get();
         disp.textContent = snap.exists ? snap.data().text : '';
       } catch(err) {
-        console.error(err);
+        console.error('Error loading note:', err);
       }
     });
 
-    // ─── Delegate Add/Edit/Delete/Undo
+    // ─── Delegate Add/Edit / Delete / Undo
     document.body.addEventListener('click', async e => {
+      // Add/Edit
       if (e.target.matches('.note-btn')) {
         e.preventDefault();
         const i    = e.target.dataset.idx;
@@ -232,11 +253,17 @@
         const cur  = snap.exists ? snap.data().text : '';
         const note = prompt(`Note for ${code}:`, cur);
         if (note !== null) {
-          await doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
+          await doc.set({
+            text: note,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          // immediately update the open popup
           const disp = document.getElementById(`note-display-${i}`);
           if (disp) disp.textContent = note;
         }
       }
+
+      // Delete
       if (e.target.matches('.delete-note-btn')) {
         e.preventDefault();
         const i    = e.target.dataset.idx;
@@ -247,8 +274,11 @@
         await doc.delete();
         const disp = document.getElementById(`note-display-${i}`);
         if (disp) disp.textContent = '';
+        // show undo link
         document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display = 'inline';
       }
+
+      // Undo
       if (e.target.matches('.undo-note-btn')) {
         e.preventDefault();
         const i    = e.target.dataset.idx;
@@ -256,7 +286,10 @@
         const doc  = db.collection('notes').doc(code);
         const prev = tempDel[code];
         if (prev !== undefined) {
-          await doc.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() });
+          await doc.set({
+            text: prev,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          });
           const disp = document.getElementById(`note-display-${i}`);
           if (disp) disp.textContent = prev;
           e.target.style.display = 'none';
