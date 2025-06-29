@@ -128,22 +128,31 @@
       cursor: pointer;
     }
 
-    /* ─── Zoom controls ───────────────────────────────────────────────── */
-    /* Default push below the seal & dropdown */
-    .leaflet-control-zoom.leaflet-bar {
-      top: 100px !important;
-    }
-    /* Fine-tune desktop vs mobile */
-    @media (min-width: 600px) {
-      .leaflet-control-zoom.leaflet-bar {
-        top: 180px !important;
-      }
-    }
-    @media (max-width: 599px) {
-      .leaflet-control-zoom.leaflet-bar {
-        top: 140px !important;
-      }
-    }
+/* ─── Put zoom back up near the top ────────────────────────────────── */
+.leaflet-control-zoom.leaflet-bar {
+  top: 10px !important;   /* same as your #title/top gutter */
+  left: 10px !important;  /* same as your seal */
+}
+
+/* ─── Shift dropdown & buttons right so they clear the zoom ─────── */
+#stationSelect,
+#shareBtn,
+#installBtn {
+  left: 70px !important;  /* 10px (gutter) + ~40px zoom + 20px spacing */
+}
+
+/* ─── On desktop widen the gutter a little, if you like ─────────── */
+@media (min-width: 600px) {
+  .leaflet-control-zoom.leaflet-bar {
+    top: 10px !important;
+    left: 10px !important;
+  }
+  #stationSelect,
+  #shareBtn,
+  #installBtn {
+    left: 80px !important; /* more room on larger screens */
+  }
+}
   </style>
 </head>
 
