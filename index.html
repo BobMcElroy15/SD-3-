@@ -90,30 +90,40 @@
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    stations.forEach((st,i) => {
-      const m = L.marker([st.lat, st.lon]).addTo(map);
-      m.on('click', async () => {
+    const markers = stations.map((st,i) => {
+      const marker = L.marker([st.lat, st.lon]).addTo(map);
+      marker.on('click', async () => {
         const snap = await db.collection('notes').doc(st.code).get();
         const note = snap.exists ? snap.data().text : '';
-        m.bindPopup(`
+        marker.bindPopup(`
           <strong>${st.code}</strong><br>${st.address}<br>
           <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a> |
-          <a href="#" onclick="addNote('${st.code}')">Add/Edit Note</a><br>
+          <a href="#" onclick="addNote('${st.code}',${i})">Add/Edit Note</a><br>
           <div style="margin-top:6px;font-style:italic;color:#555;">${note}</div>
         `).openPopup();
       });
       const opt = new Option(`${st.code} – ${st.address}`, i);
       select.add(opt);
+      return marker;
     });
 
-    select.onchange = ()=> map.setView([stations[select.value].lat,stations[select.value].lon],17);
+    select.onchange = () => {
+      const idx = select.value;
+      if (idx !== '') {
+        map.setView(markers[idx].getLatLng(),17,{animate:true});
+        markers[idx].fire('click');
+      }
+    };
 
-    window.addNote = async code => {
+    window.addNote = async (code,idx) => {
       const doc = db.collection('notes').doc(code);
       const snap = await doc.get();
       const current = snap.exists ? snap.data().text : '';
       const note = prompt(`Note for ${code}:`, current);
-      if (note!==null) await doc.set({text:note,updated:firebase.firestore.FieldValue.serverTimestamp()});
+      if (note!==null){
+        await doc.set({text:note,updated:firebase.firestore.FieldValue.serverTimestamp()});
+        markers[idx].fire('click');
+      }
     };
   </script>
 </body>
