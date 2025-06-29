@@ -207,6 +207,22 @@
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
+    // ─── Restrict map to pump-station bounds ────────────────────────────
+// 1) Define the bounds (min lat, min lon) and (max lat, max lon)
+const southWest = L.latLng(40.65, -73.42);
+const northEast = L.latLng(40.82, -73.19);
+const bounds    = L.latLngBounds(southWest, northEast);
+
+// 2) Apply those bounds so users can't pan outside
+map.setMaxBounds(bounds);
+
+// 3) Optionally clamp zoom levels to your area
+map.options.minZoom = 11;
+map.options.maxZoom = 17;
+
+// 4) Re-center if needed
+map.setView(bounds.getCenter(), 12);
+
     // Populate dropdown & markers
     const select = document.getElementById('stationSelect'),
           markers = [],
