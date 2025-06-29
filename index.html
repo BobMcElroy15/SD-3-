@@ -36,6 +36,26 @@
     body { margin:0; padding:0; }
     #map { height:100vh; }
 
+      /* County seal in top-left */
+  #seal {
+    position: absolute;
+    top: 10px;    /* same as #title */
+    left: 10px;   /* small gutter from the left edge */
+    width: 40px;  /* scale as you like */
+    height: auto;
+    z-index: 1000;
+  }
+
+  /* shift the title right to clear the seal */
+  #title {
+    top: 10px;
+    left: 60px;                           /* push it over */
+    width: calc(100% - 70px);             /* shrink to fit */
+    max-width: calc(400px - 20px);        /* adjust your max-width too */
+    /* leave the rest of your existing #title rules untouched */
+  }
+
+
     /* Title + dropdown */
     #title {
       position:absolute; top:10px; left:5%; width:90%; max-width:400px;
@@ -83,6 +103,15 @@
   </style>
 </head>
 <body>
+
+  <body>
+  <!-- Add the seal image here -->
+  <img id="seal" src="FlatSeal200px.png" alt="Suffolk County Seal">
+
+  <!-- Your existing title -->
+  <div id="title">Sewer District 3 Pump Station Map</div>
+  
+  <!-- …the rest of your body… -->
 
   <div id="title">Sewer District 3 Pump Station Map</div>
   <select id="stationSelect">
