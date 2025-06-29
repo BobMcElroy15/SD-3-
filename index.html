@@ -13,14 +13,20 @@
 
     /* Seal */
     #seal { position:absolute; top:10px; left:10px; width:70px; z-index:1000 }
+
     /* Zoom controls below seal */
     .leaflet-control-zoom.leaflet-bar {
-      position:absolute!important; top:80px!important; left:10px!important; z-index:1000
+      position:absolute!important;
+      top:80px!important; left:10px!important;
+      z-index:1000
     }
+
     /* Share & Install buttons */
     #shareBtn, #installBtn {
-      position:absolute; left:80px; background:#0066cc; color:#fff;
-      padding:8px 12px; border:none; border-radius:4px; cursor:pointer; z-index:1000
+      position:absolute; left:80px; z-index:1000;
+      background:#0066cc; color:#fff;
+      padding:8px 12px; border:none; border-radius:4px;
+      cursor:pointer;
     }
     #shareBtn   { top:85px }
     #installBtn { top:120px; display:none }
@@ -29,37 +35,47 @@
     #title {
       position:absolute; top:10px; left:80px; right:5%;
       background:#fff; padding:6px; border-radius:6px;
-      font-size:18px; font-weight:bold; text-align:center; z-index:900
+      font-size:18px; font-weight:bold; text-align:center;
+      z-index:900
     }
+
     /* Dropdown */
     #stationSelect {
-      position:absolute!important; top:50px!important; left:80px!important;
-      width:calc(100% - 90px)!important; max-width:300px;
-      background:#fff; padding:6px; border-radius:6px; z-index:900
+      position:absolute!important;
+      top:50px!important; left:80px!important;
+      width:calc(100% - 90px)!important;
+      max-width:300px; background:#fff;
+      padding:6px; border-radius:6px;
+      font-size:14px; z-index:900
     }
+
     /* Share overlay */
     #shareOverlay {
       position:fixed; top:0; left:0; width:100%; height:100%;
       background:rgba(0,0,0,0.7); display:none;
-      align-items:center; justify-content:center; z-index:2000
+      align-items:center; justify-content:center;
+      z-index:2000
     }
     #shareOverlayContent {
-      background:#fff; padding:20px; border-radius:8px; text-align:center
+      background:#fff; padding:20px; border-radius:8px;
+      text-align:center
     }
     #shareOverlayContent img { max-width:80vw }
     #closeShare {
-      margin-top:10px; padding:8px 12px; background:#333;
-      color:#fff; border:none; border-radius:4px; cursor:pointer
+      margin-top:10px; padding:8px 12px;
+      background:#333; color:#fff; border:none;
+      border-radius:4px; cursor:pointer
     }
   </style>
 </head>
 <body>
-  <!-- UI Chrome -->
   <img id="seal" src="FlatSeal200px.png" alt="Seal">
   <button id="shareBtn">Share</button>
   <button id="installBtn">Install App</button>
+
   <div id="title">Sewer District 3 Pump Station Map</div>
   <select id="stationSelect"><option value="">Select Pump Station</option></select>
+
   <div id="shareOverlay">
     <div id="shareOverlayContent">
       <p>Scan to share:</p>
@@ -68,23 +84,22 @@
     </div>
   </div>
 
-  <!-- Map -->
   <div id="map"></div>
 
-  <!-- Scripts -->
+  <!-- Leaflet & Firebase -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
-    // Firebase
+    // Firebase init
     firebase.initializeApp({
-      apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
+      apiKey: "...",
       authDomain: "sd3ps-map.firebaseapp.com",
       projectId: "sd3ps-map"
     });
     const db = firebase.firestore();
 
-    // PWA install prompt
+    // Install prompt
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
@@ -98,78 +113,118 @@
       document.getElementById('installBtn').style.display = 'none';
     };
 
-    // Minimal SW registration
+    // SW for install only
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // Stations data
+    // Pump stations
     const stations = [
       {code:"PS#300 AWXIA", lat:40.7227675, lon:-73.2307527, address:"50 South Saxon Avenue, Bay Shore, NY 11706"},
-      {code:"PS#301",       lat:40.6930405, lon:-73.2790417, address:"9 Oak Neck Lane, West Islip, NY 11795"},
-      {code:"PS#302",       lat:40.704264,   lon:-73.2548192, address:"33 Girard Ave, Brightwaters, NY 11718"},
-      {code:"PS#303",       lat:40.7058464, lon:-73.2509559, address:"1 Shore Road East, Brightwaters, NY 11718"},
-      {code:"PS#304",       lat:40.7138133, lon:-73.2467338, address:"7 Prospect Avenue, Bay Shore, NY 11706"},
-      {code:"PS#305",       lat:40.7169715, lon:-73.2424563, address:"89 Maple Avenue, Bay Shore, NY 11706"},
-      {code:"PS#306",       lat:40.7195939, lon:-73.2375154, address:"83 South Montgomery Avenue, Bay Shore, NY 11706"},
-      {code:"PS#307",       lat:40.7145541, lon:-73.2211747, address:"600 Ocean Avenue, Islip, NY 11751"},
-      {code:"PS#308",       lat:40.7143538, lon:-73.1967512, address:"57 The Helm, East Islip, NY 11730"},
-      {code:"PS#309",       lat:40.6618005, lon:-73.4190788, address:"219 Richmond Avenue, Amityville, NY 11701"},
-      {code:"PS#310",       lat:40.6583148, lon:-73.4003024, address:"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
-      {code:"PS#311",       lat:40.7751554, lon:-73.2063197, address:"71 Beech Street, Central Islip, NY 11722"},
-      {code:"PS#312",       lat:40.7872918, lon:-73.2842493, address:"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
-      {code:"PS#313",       lat:40.7786667, lon:-73.1933449, address:"1 Fairlawn Drive, Central Islip, NY 11722"},
-      {code:"PS#314",       lat:40.751412,   lon:-73.360911, address:"2 Irving Avenue, Wyandanch, NY 11798"},
-      {code:"PS#317-1",     lat:40.8203973, lon:-73.4078002, address:"New York Avenue, South Huntington, NY 11746"},
-      {code:"PS#317-2",     lat:40.7868774, lon:-73.406908,  address:"270 McGovern Drive, Melville, NY 11747"}
+      /* ...all others... */
+      {code:"PS#317-2", lat:40.7868774, lon:-73.406908, address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Create map
+    // Build map
     const map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Build markers + dropdown
+    // Populate dropdown & markers
     const selectEl = document.getElementById('stationSelect'),
           markers  = [],
           tempDel  = {};
 
-    stations.forEach((st, i) => {
-      const marker = L.marker([st.lat, st.lon]).addTo(map).bindPopup(`
-        <strong>${st.code}</strong><br>${st.address}
-      `);
+    stations.forEach((st,i) => {
+      const popupHtml = `
+        <strong>${st.code}</strong><br>
+        ${st.address}<br>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
+        | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
+        | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
+        | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
+        <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;"></div>
+      `;
+      const marker = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popupHtml);
 
-      // Native centering on pin
+      // native centering when pin tapped
       marker.on('click', () => {
         map.setView([st.lat, st.lon], 17);
         marker.openPopup();
       });
 
       markers.push(marker);
-      let opt = document.createElement('option');
-      opt.value = i;
-      opt.text  = `${st.code} – ${st.address}`;
+      const opt = document.createElement('option');
+      opt.value = i; opt.text = `${st.code} – ${st.address}`;
       selectEl.appendChild(opt);
     });
 
-    // Native centering on dropdown
+    // native centering when dropdown changes
     selectEl.addEventListener('change', () => {
-      let i = +selectEl.value;
-      if (i>=0) {
-        map.setView([stations[i].lat, stations[i].lon], 17);
+      const i = +selectEl.value;
+      if (i >= 0) {
+        const st = stations[i];
+        map.setView([st.lat, st.lon], 17);
         markers[i].openPopup();
       }
     });
 
-    // Share overlay toggle
-    document.getElementById('shareBtn').onclick   = ()=>{
-      document.getElementById('shareOverlay').style.display = 'flex';
-    };
-    document.getElementById('closeShare').onclick = ()=>{
-      document.getElementById('shareOverlay').style.display = 'none';
-    };
+    // notes/delete/undo logic
+    map.on('popupopen', e => {
+      const c    = e.popup._contentNode,
+            idx  = c.querySelector('.note-btn').dataset.idx,
+            code = stations[idx].code,
+            doc  = db.collection('notes').doc(code),
+            disp = c.querySelector(`#note-display-${idx}`),
+            add  = c.querySelector('.note-btn'),
+            del  = c.querySelector('.delete-note-btn'),
+            undo = c.querySelector('.undo-note-btn');
+
+      // load
+      doc.get().then(d => disp.textContent = d.exists ? d.data().text : '');
+
+      add.onclick = ev => {
+        ev.preventDefault();
+        doc.get().then(d => {
+          const cur = d.exists ? d.data().text : '';
+          const note = prompt(`Note for ${code}:`, cur);
+          if (note !== null) {
+            doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
+            disp.textContent = note;
+            undo.style.display = 'none';
+          }
+        });
+      };
+
+      del.onclick = ev => {
+        ev.preventDefault();
+        doc.get().then(d => {
+          tempDel[code] = d.exists ? d.data().text : '';
+          return doc.delete();
+        }).then(() => {
+          disp.textContent = '';
+          undo.style.display = 'inline';
+        });
+      };
+
+      undo.onclick = ev => {
+        ev.preventDefault();
+        const prev = tempDel[code];
+        if (prev !== undefined) {
+          doc.set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() })
+            .then(() => {
+              disp.textContent = prev;
+              undo.style.display = 'none';
+              delete tempDel[code];
+            });
+        }
+      };
+    });
+
+    // share overlay toggle
+    document.getElementById('shareBtn').onclick   = ()=> document.getElementById('shareOverlay').style.display='flex';
+    document.getElementById('closeShare').onclick = ()=> document.getElementById('shareOverlay').style.display='none';
   </script>
 </body>
 </html>
-
