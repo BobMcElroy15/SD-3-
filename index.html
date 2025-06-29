@@ -91,10 +91,10 @@
     #installBtn { top: 160px; display: none; }
 
     @media(min-width:600px) {
-      #title       { left: 50px; right: auto; }
+      #title         { left: 50px; right: auto; }
       #stationSelect { left: 50px; }
-      #shareBtn    { left: 50px; }
-      #installBtn  { left: 50px; }
+      #shareBtn      { left: 50px; }
+      #installBtn    { left: 50px; }
     }
 
     /* Share overlay */
@@ -127,14 +127,12 @@
       border-radius: 4px;
       cursor: pointer;
     }
-  
-    /* push Leaflet's zoom buttons down so they don't cover the seal */
-.leaflet-control-container .leaflet-control-zoom {
-  position: absolute;
-  top: 60px; /* adjust up/down as needed */
-}
 
-  
+    /* ─── THIS BIT pushes the zoom controls down ─── */
+    .leaflet-control-zoom.leaflet-bar {
+      position: absolute !important;
+      top: 60px !important;  /* adjust this value up/down as you like */
+    }
   </style>
 </head>
 
@@ -168,6 +166,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
-  <!-- …rest of your existing scripts (Firebase init, stations, popups, etc.) … -->
+  <!-- (Your existing map & Firestore code goes here) -->
+
 </body>
 </html>
