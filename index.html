@@ -13,34 +13,23 @@
   <style>
     body { margin:0; padding:0; }
     #map  { height:100vh; }
-
-    /* Seal */
     #seal { position:absolute; top:10px; left:10px; width:70px; z-index:1000; }
-
-    /* Zoom controls below seal */
     .leaflet-control-zoom.leaflet-bar {
       position:absolute!important;
       top:80px!important; left:10px!important; z-index:1000;
     }
-
-    /* Install button */
     #installBtn {
       position:absolute; top:120px; left:80px; z-index:1000;
       background:#0066cc; color:#fff;
       padding:8px 12px; border:none; border-radius:4px;
-      font-size:14px; cursor:pointer;
-      display:none;
+      font-size:14px; cursor:pointer; display:none;
     }
-
-    /* Title */
     #title {
       position:absolute; top:10px; left:80px; right:5%;
       background:#fff; padding:6px; border-radius:6px;
       font-size:18px; font-weight:bold; text-align:center;
       z-index:900;
     }
-
-    /* Dropdown */
     #stationSelect {
       position:absolute!important; top:50px!important; left:80px!important;
       width:calc(100% - 90px)!important; max-width:300px;
@@ -52,19 +41,15 @@
 <body>
   <img id="seal" src="FlatSeal200px.png" alt="County Seal">
   <button id="installBtn">Install App</button>
-
   <div id="title">Sewer District 3 Pump Station Map</div>
-  <select id="stationSelect">
-    <option value="">Select Pump Station</option>
-  </select>
-
+  <select id="stationSelect"><option value="">Select Pump Station</option></select>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
-    // ─── Firebase init ─────────────────────────────────────────────────
+    // Firebase init
     firebase.initializeApp({
       apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain: "sd3ps-map.firebaseapp.com",
@@ -72,94 +57,99 @@
     });
     const db = firebase.firestore();
 
-    // ─── PWA install prompt ─────────────────────────────────────────────
+    // PWA install prompt
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
       deferredPrompt = e;
-      document.getElementById('installBtn').style.display = 'block';
+      installBtn.style.display = 'block';
     });
-    document.getElementById('installBtn').addEventListener('click', async () => {
+    installBtn.addEventListener('click', async () => {
       deferredPrompt.prompt();
       await deferredPrompt.userChoice;
       deferredPrompt = null;
-      document.getElementById('installBtn').style.display = 'none';
+      installBtn.style.display = 'none';
     });
 
-    // ─── Service Worker (install only) ─────────────────────────────────
+    // Service Worker (install only)
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // ─── Pump-station list ───────────────────────────────────────────────
+    // Pump station list
     const stations = [
       {code:"PS#300 AWXIA", lat:40.7227675, lon:-73.2307527, address:"50 South Saxon Avenue, Bay Shore, NY 11706"},
-      {code:"PS#301",         lat:40.6930405, lon:-73.2790417, address:"9 Oak Neck Lane, West Islip, NY 11795"},
-      {code:"PS#302",         lat:40.704264,  lon:-73.2548192, address:"33 Girard Ave, Brightwaters, NY 11718"},
-      {code:"PS#303",         lat:40.7058464, lon:-73.2509559, address:"1 Shore Road East, Brightwaters, NY 11718"},
-      {code:"PS#304",         lat:40.7138133, lon:-73.2467338, address:"7 Prospect Avenue, Bay Shore, NY 11706"},
-      {code:"PS#305",         lat:40.7169715, lon:-73.2424563, address:"89 Maple Avenue, Bay Shore, NY 11706"},
-      {code:"PS#306",         lat:40.7195939, lon:-73.2375154, address:"83 South Montgomery Ave, Bay Shore, NY 11706"},
-      {code:"PS#307",         lat:40.7145541, lon:-73.2211747, address:"600 Ocean Avenue, Islip, NY 11751"},
-      {code:"PS#308",         lat:40.7143538, lon:-73.1967512, address:"57 The Helm, East Islip, NY 11730"},
-      {code:"PS#309",         lat:40.6618005, lon:-73.4190788, address:"219 Richmond Avenue, Amityville, NY 11701"},
-      {code:"PS#310",         lat:40.6583148, lon:-73.4003024, address:"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
-      {code:"PS#311",         lat:40.7751554, lon:-73.2063197, address:"71 Beech Street, Central Islip, NY 11722"},
-      {code:"PS#312",         lat:40.7872918, lon:-73.2842493, address:"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
-      {code:"PS#313",         lat:40.7786667, lon:-73.1933449, address:"1 Fairlawn Drive, Central Islip, NY 11722"},
-      {code:"PS#314",         lat:40.751412,  lon:-73.360911,  address:"2 Irving Avenue, Wyandanch, NY 11798"},
-      {code:"PS#317-1",       lat:40.8203973, lon:-73.4078002, address:"New York Avenue, South Huntington, NY 11746"},
-      {code:"PS#317-2",       lat:40.7868774, lon:-73.406908,  address:"270 McGovern Drive, Melville, NY 11747"}
+      {code:"PS#301",       lat:40.6930405, lon:-73.2790417, address:"9 Oak Neck Lane, West Islip, NY 11795"},
+      {code:"PS#302",       lat:40.704264,  lon:-73.2548192, address:"33 Girard Ave, Brightwaters, NY 11718"},
+      {code:"PS#303",       lat:40.7058464, lon:-73.2509559, address:"1 Shore Road East, Brightwaters, NY 11718"},
+      {code:"PS#304",       lat:40.7138133, lon:-73.2467338, address:"7 Prospect Avenue, Bay Shore, NY 11706"},
+      {code:"PS#305",       lat:40.7169715, lon:-73.2424563, address:"89 Maple Avenue, Bay Shore, NY 11706"},
+      {code:"PS#306",       lat:40.7195939, lon:-73.2375154, address:"83 South Montgomery Avenue, Bay Shore, NY 11706"},
+      {code:"PS#307",       lat:40.7145541, lon:-73.2211747, address:"600 Ocean Avenue, Islip, NY 11751"},
+      {code:"PS#308",       lat:40.7143538, lon:-73.1967512, address:"57 The Helm, East Islip, NY 11730"},
+      {code:"PS#309",       lat:40.6618005, lon:-73.4190788, address:"219 Richmond Avenue, Amityville, NY 11701"},
+      {code:"PS#310",       lat:40.6583148, lon:-73.4003024, address:"Jefferson Rd, Copiague (Amity Harbor), Amityville, NY 11701"},
+      {code:"PS#311",       lat:40.7751554, lon:-73.2063197, address:"71 Beech Street, Central Islip, NY 11722"},
+      {code:"PS#312",       lat:40.7872918, lon:-73.2842493, address:"Pilgrim State (20 Sagtikos Parkway), Brentwood, NY 11717"},
+      {code:"PS#313",       lat:40.7786667, lon:-73.1933449, address:"1 Fairlawn Drive, Central Islip, NY 11722"},
+      {code:"PS#314",       lat:40.751412,  lon:-73.360911,  address:"2 Irving Avenue, Wyandanch, NY 11798"},
+      {code:"PS#317-1",     lat:40.8203973, lon:-73.4078002, address:"New York Avenue, South Huntington, NY 11746"},
+      {code:"PS#317-2",     lat:40.7868774, lon:-73.406908,  address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // ─── Leaflet map + dropdown ─────────────────────────────────────────
+    // Initialize map & dropdown
     const map    = L.map('map').setView([40.730889, -73.284654], 12),
           select = document.getElementById('stationSelect');
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // create all markers, populate dropdown
+    // Build markers + dropdown options
     const markers = stations.map((st,i) => {
       const m = L.marker([st.lat, st.lon]).addTo(map);
+
+      // both manual click and dropdown will use this same zoom & popup logic:
       m.on('click', async () => {
-        // fetch & show note in popup
+        // fetch stored note
         const snap = await db.collection('notes').doc(st.code).get();
         const note = snap.exists ? snap.data().text : '';
-        m.bindPopup(`
+        // prepare popup content
+        const html = `
           <strong>${st.code}</strong><br>
           ${st.address}<br>
           <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}"
              target="_blank">Navigate</a> |
-          <a href="#" onclick="addNote('${st.code}', ${i})">Add/Edit Note</a><br>
+          <a href="#" onclick="addNote('${st.code}',${i})">Add/Edit Note</a><br>
           <div style="margin-top:6px;font-style:italic;color:#555;">${note}</div>
-        `).openPopup();
+        `;
+        m.bindPopup(html);
+        // after zoom completes, open popup
+        map.once('moveend', () => m.openPopup());
+        map.setView([st.lat, st.lon], 17, { animate:true, duration:0.8 });
       });
-      // dropdown entry
+
+      // add dropdown entry
       select.append(new Option(`${st.code} – ${st.address}`, i));
       return m;
     });
 
-    // when you pick from the dropdown, pan/zoom and “click” the marker
+    // when user picks from dropdown, fire the same 'click' flow
     select.onchange = () => {
       const idx = select.value;
       if (idx !== '') {
-        const latlng = markers[idx].getLatLng();
-        map.once('moveend', () => markers[idx].fire('click'));
-        map.setView(latlng, 17, { animate:true, duration:0.8 });
+        markers[idx].fire('click');
       }
     };
 
-    // helper to Add/Edit a note
+    // helper for Add/Edit Note
     window.addNote = async (code, idx) => {
-      const doc    = db.collection('notes').doc(code);
-      const snap   = await doc.get();
-      const current= snap.exists ? snap.data().text : '';
-      const note   = prompt(`Note for ${code}:`, current);
+      const doc  = db.collection('notes').doc(code);
+      const snap = await doc.get();
+      const cur  = snap.exists ? snap.data().text : '';
+      const note = prompt(`Note for ${code}:`, cur);
       if (note !== null) {
         await doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
-        // re-open popup to refresh display
+        // refresh the popup so new note appears
         markers[idx].fire('click');
       }
     };
