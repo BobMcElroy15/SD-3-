@@ -1,16 +1,16 @@
 // service-worker.js
 
 self.addEventListener('install', evt => {
-  // immediately activate without doing anything
-  self.skipWaiting();
+  // Activate immediately
+  evt.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', evt => {
-  // take control right away
-  self.clients.claim();
+  // Take control of clients right away
+  evt.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('fetch', evt => {
-  // bypass cache entirely
+  // Always go to the network—never cache
   evt.respondWith(fetch(evt.request));
 });
