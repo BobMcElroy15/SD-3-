@@ -35,10 +35,19 @@
     body { margin:0; padding:0; }
     #map  { height:100vh; }
 
-    /* ─── Lower the Leaflet zoom controls so they clear your UI ───────── */
-.leaflet-control-zoom.leaflet-bar {
-  top: 180px !important;
+/* ─── Zoom below your buttons on desktop ───────── */
+@media (min-width: 600px) {
+  .leaflet-control-zoom.leaflet-bar {
+    top: 180px !important;
+  }
 }
+/* ─── Zoom a bit higher on small (mobile) screens ───────── */
+@media (max-width: 599px) {
+  .leaflet-control-zoom.leaflet-bar {
+    top: 140px !important;
+  }
+}
+
     /* ─── Seal ─────────────────────────────────────────────────────────── */
     #seal {
       position: absolute;
