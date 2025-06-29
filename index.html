@@ -70,20 +70,21 @@
       z-index: 900;
     }
 
-    /* ─── Dropdown ───────────────────────────────────────────────────── */
-    #stationSelect {
-      position: absolute;
-      top: 70px;                 /* align under share */
-      left: 140px;               /* 70px + ~70px share width */
-      width: calc(100% - 150px);
-      max-width: 300px;
-      background: white;
-      padding: 6px;
-      border-radius: 6px;
-      font-size: 14px;
-      z-index: 900;
-    }
+ /* ─── Dropdown below title, above Share ──────────────────────────── */
+#stationSelect {
+  position: absolute !important;
+  top: 50px !important;    /* between title (10px) and Share (70px) */
+  left: 80px !important;    /* same as your #title’s left */
+  width: calc(100% - 90px) !important; /* leave a little right gutter */
+  max-width: 300px;
+  background: white;
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 14px;
+  z-index: 900;
+}
 
+    
     /* ─── Share Overlay ───────────────────────────────────────────────── */
     #shareOverlay {
       position: fixed;
