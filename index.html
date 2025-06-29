@@ -168,7 +168,7 @@
       deferredPrompt = null;
     });
 
-    // Register service worker
+    // Service worker registration
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
@@ -194,7 +194,13 @@
       {code:"PS#317-2",lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // Initialize map WITHOUT default zoom
+    // Helper: recenter so marker appears centered in visible area
+    function setViewWithOffset(latlng, zoom, offsetX) {
+      const p = map.project(latlng, zoom).subtract([offsetX, 0]);
+      map.setView(map.unproject(p, zoom), zoom);
+    }
+
+    // Initialize map
     const map = L.map('map');
 
     // Add tile layer
@@ -202,10 +208,10 @@
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Restrict & fit to bounds
-    const southWest = L.latLng(40.65, -73.42);
-    const northEast = L.latLng(40.82, -73.19);
-    const bounds    = L.latLngBounds(southWest, northEast);
+    // Bounds & initial fit
+    const sw     = L.latLng(40.65, -73.42),
+          ne     = L.latLng(40.82, -73.19),
+          bounds = L.latLngBounds(sw, ne);
 
     map.setMaxBounds(bounds);
     map.options.minZoom = 5;
@@ -213,11 +219,11 @@
     map.fitBounds(bounds);
 
     // Populate dropdown & markers
-    const select = document.getElementById('stationSelect'),
+    const select  = document.getElementById('stationSelect'),
           markers = [],
           tempDel = {};
 
-    stations.forEach((st, i) => {
+    stations.forEach((st,i) => {
       const marker = L.marker([st.lat, st.lon]).addTo(map)
         .bindPopup(`
           <strong>${st.code}</strong><br>${st.address}<br>
@@ -228,24 +234,24 @@
           <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;"></div>
         `);
 
-      // zoom in when marker is clicked
+      // Zoom+recenter when clicked
       marker.on('click', () => {
-        map.setView([st.lat, st.lon], 17);
+        setViewWithOffset([st.lat, st.lon], 17, 150);
         marker.openPopup();
       });
 
       markers[i] = marker;
 
-      const o = document.createElement('option');
-      o.value = i;
-      o.text  = `${st.code} – ${st.address}`;
-      select.appendChild(o);
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.text  = `${st.code} – ${st.address}`;
+      select.appendChild(opt);
     });
 
-    // On selection, zoom to street level
+    // Dropdown handler
     select.addEventListener('change', () => {
       const i = +select.value;
-      map.setView([stations[i].lat, stations[i].lon], 17);
+      setViewWithOffset([stations[i].lat, stations[i].lon], 17, 150);
       markers[i].openPopup();
     });
 
@@ -305,13 +311,5 @@
     document.getElementById('closeShare').onclick = () => document.getElementById('shareOverlay').style.display = 'none';
   </script>
 
-  <!-- Minimal Service Worker registration for install prompt -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('service-worker.js')
-        .catch(console.error);
-    }
-  </script>
 </body>
 </html>
