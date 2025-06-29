@@ -127,6 +127,14 @@
       border-radius: 4px;
       cursor: pointer;
     }
+  
+    /* push Leaflet's zoom buttons down so they don't cover the seal */
+.leaflet-control-container .leaflet-control-zoom {
+  position: absolute;
+  top: 60px; /* adjust up/down as needed */
+}
+
+  
   </style>
 </head>
 
