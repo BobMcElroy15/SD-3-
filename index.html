@@ -107,13 +107,18 @@
       return marker;
     });
 
-    select.onchange = () => {
-      const idx = select.value;
-      if (idx !== '') {
-        map.setView(markers[idx].getLatLng(),17,{animate:true});
-        markers[idx].fire('click');
-      }
-    };
+ // Smoothly pan/zoom, then open popup
+select.onchange = () => {
+  const idx = select.value;
+  if (idx !== '') {
+    const latLng = markers[idx].getLatLng();
+    map.setView(latLng, 17, { animate: true, duration: 0.8 });
+    map.once('moveend', () => {
+      markers[idx].fire('click');
+    });
+  }
+};
+
 
     window.addNote = async (code,idx) => {
       const doc = db.collection('notes').doc(code);
