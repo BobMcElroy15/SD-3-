@@ -22,9 +22,9 @@
     input { width:100%; box-sizing:border-box; }
     button { margin:0 4px; }
     /* hide Save/Cancel until Edit pressed */
-    button.save, button.cancel { display:none; }
-    /* make rows look clickable outside the Actions column */
-    tbody tr td:not(:last-child) { cursor: pointer; }
+    button.save, button.cancel { display:none !important; }
+    /* make cells outside Actions look clickable */
+    tbody tr td:not(:last-child) { cursor:pointer; }
   </style>
 </head>
 <body>
@@ -36,7 +36,11 @@
     <table>
       <thead>
         <tr>
-          <th>Code</th><th>Address</th><th>Lat</th><th>Lon</th><th>Actions</th>
+          <th>Code</th>
+          <th>Address</th>
+          <th>Lat</th>
+          <th>Lon</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -84,7 +88,7 @@
       let { address, lat, lon } = doc.data();
       docs[idx] = doc;
 
-      // build row
+      // build row with all 4 buttons present
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><input class="code" value="${code}" disabled></td>
@@ -99,7 +103,7 @@
         </td>`;
       tbody.appendChild(tr);
 
-      // only non-action cells open popup
+      // only non-action cells fire the popup
       Array.from(tr.querySelectorAll('td:not(:last-child)'))
         .forEach(td => td.addEventListener('click', () => markers[idx].fire('click')));
 
@@ -114,17 +118,18 @@
         const popup = `
           <strong>${code}</strong><br>
           ${address}<br>
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank">Navigate</a>
-          | <a href="#" class="note-btn"    data-idx="${idx}">Add/Edit Note</a>
-          | <a href="#" class="del-note"    data-idx="${idx}">Delete Note</a>
-          | <a href="#" class="undo-note"   data-idx="${idx}" style="display:none">Undo</a>
-          | <a href="#" class="adjust-pin"  data-idx="${idx}">Adjust Pin</a>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+             target="_blank">Navigate</a>
+          | <a href="#" class="note-btn"   data-idx="${idx}">Add/Edit Note</a>
+          | <a href="#" class="del-note"   data-idx="${idx}">Delete Note</a>
+          | <a href="#" class="undo-note"  data-idx="${idx}" style="display:none">Undo</a>
+          | <a href="#" class="adjust-pin" data-idx="${idx}">Adjust Pin</a>
           <br>
           <div id="note-display-${idx}" style="font-style:italic;color:#555">${note}</div>`;
         map.once('moveend', ()=> m.bindPopup(popup).openPopup());
         map.setView([lat, lon],17,{animate:true,duration:0.8});
 
-        // scroll + highlight
+        // highlight the row
         document.querySelectorAll('tr').forEach(r=>r.classList.remove('highlight'));
         tr.scrollIntoView({behavior:'smooth',block:'nearest'});
         tr.classList.add('highlight');
@@ -137,11 +142,13 @@
 
     // ─── Table Edit/Save/Cancel/Delete
     tbody.addEventListener('click', async e=>{
-      const idx = +e.target.dataset.idx, tr = tbody.children[idx];
-      const code= tr.querySelector('.code').value;
+      const idx = +e.target.dataset.idx;
+      if (isNaN(idx)) return;
+      const tr   = tbody.children[idx];
+      const code = tr.querySelector('.code').value;
 
       if (e.target.matches('.edit')){
-        ['addr','lat','lon'].forEach(c=>tr.querySelector('.'+c).disabled=false);
+        ['addr','lat','lon'].forEach(c=>tr.querySelector(`.${c}`).disabled=false);
         tr.querySelector('.edit').style.display   = 'none';
         tr.querySelector('.save').style.display   = '';
         tr.querySelector('.cancel').style.display = '';
@@ -186,7 +193,7 @@
       if (e.target.matches('.del-note')){
         e.preventDefault();
         const snapN = await db.collection('notes').doc(code).get();
-        tempDel[code] = snapN.exists ? snapN.data().text : '';
+        tempDel[code] = snapN.exists? snapN.data().text:'';
         await db.collection('notes').doc(code).delete();
         document.getElementById(`note-display-${idx}`).textContent='';
         e.target.nextElementSibling.style.display='inline';
@@ -198,7 +205,7 @@
           text:tempDel[code],
           updated:firebase.firestore.FieldValue.serverTimestamp()
         });
-        document.getElementById(`note-display-${idx}`).textContent = tempDel[code];
+        document.getElementById(`note-display-${idx}`).textContent=tempDel[code];
         e.target.style.display='none';
         delete tempDel[code];
       }
@@ -218,7 +225,6 @@
         }
       }
     });
-
   })();
   </script>
 </body>
