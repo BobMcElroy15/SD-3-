@@ -67,12 +67,14 @@
       z-index:2000;
     }
     #shareOverlayContent {
-      background:#fff; padding:20px; border-radius:8px; text-align:center;
+      background:#fff; padding:20px; border-radius:8px;
+      text-align:center;
     }
     #shareOverlayContent img { max-width:80vw; }
     #closeShare {
       margin-top:10px; padding:8px 12px;
-      background:#333; color:#fff; border:none; border-radius:4px; cursor:pointer;
+      background:#333; color:#fff; border:none;
+      border-radius:4px; cursor:pointer;
     }
   </style>
 </head>
@@ -104,20 +106,20 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <!-- Analytics SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
   <script>
-    // ─── Firebase init ─────────────────────────────────────────────────
+    // ─── Firebase init (with full config for Analytics) ─────────────────
     firebase.initializeApp({
-      apiKey:    "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
-      authDomain:"sd3ps-map.firebaseapp.com",
-      projectId: "sd3ps-map",
-      measurementId: "G-HHX1X8KFSF"    // ← your Analytics ID
+      apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
+      authDomain:        "sd3ps-map.firebaseapp.com",
+      projectId:         "sd3ps-map",
+      storageBucket:     "sd3ps-map.appspot.com",
+      messagingSenderId: "14976888367",
+      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
+      measurementId:     "G-HHX1X8KFSF"
     });
-    // Initialize Analytics
     firebase.analytics();
-
     const db = firebase.firestore();
 
     // ─── Grab buttons & inputs ─────────────────────────────────────────
@@ -150,10 +152,11 @@
 
     // ─── Service worker (install only) ─────────────────────────────────
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(console.error);
+      navigator.serviceWorker.register('service-worker.js')
+        .catch(console.error);
     }
 
-    // ─── Pump station data ──────────────────────────────────────────────
+    // ─── All pump stations ──────────────────────────────────────────────
     const stations = [
       {code:"PS#300 AWXIA",lat:40.7227675,lon:-73.2307527,address:"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {code:"PS#301",lat:40.6930405,lon:-73.2790417,address:"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -175,15 +178,15 @@
     ];
 
     // ─── Leaflet map ────────────────────────────────────────────────────
-    const map = L.map('map').setView([40.730889, -73.284654], 12);
+    const map    = L.map('map').setView([40.730889, -73.284654], 12),
+          markers= [],
+          tempDel= {};
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // ─── Keep track of markers & temp storage ────────────────────────────
-    const markers = [], tempDel = {};
-
-    // ─── Build markers & dropdown options ───────────────────────────────
+    // ─── Build markers & dropdown ────────────────────────────────────────
     stations.forEach((st,i) => {
       const popupHTML = `
         <strong>${st.code}</strong><br>
@@ -196,10 +199,12 @@
         <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;"></div>
       `;
       const m = L.marker([st.lat, st.lon]).addTo(map).bindPopup(popupHTML);
+
       m.on('click', () => {
         map.once('moveend', () => m.openPopup());
         map.setView([st.lat, st.lon], 17, { animate:true, duration:0.8 });
       });
+
       markers.push(m);
 
       const opt = document.createElement('option');
@@ -207,7 +212,7 @@
       stationSelect.appendChild(opt);
     });
 
-    // ─── Dropdown pan/zoom + popup ──────────────────────────────────────
+    // ─── Dropdown selection ─────────────────────────────────────────────
     stationSelect.addEventListener('change', () => {
       const i = +stationSelect.value;
       if (i >= 0) {
@@ -216,7 +221,7 @@
       }
     });
 
-    // ─── On any popup open, load note text ──────────────────────────────
+    // ─── On popup open, load & display note ─────────────────────────────
     map.on('popupopen', async e => {
       const node = e.popup._contentNode;
       const idx  = node.querySelector('.note-btn').dataset.idx;
@@ -240,9 +245,10 @@
         const snap = await doc.get();
         const cur  = snap.exists ? snap.data().text : '';
         const note = prompt(`Note for ${code}:`, cur);
-        if (note !== null) {
-          await doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
-          document.getElementById(`note-display-${i}`).textContent = note;
+        if (note!==null) {
+          await doc.set({ text: note, updated:firebase.firestore.FieldValue.serverTimestamp() });
+          const disp = document.getElementById(`note-display-${i}`);
+          if (disp) disp.textContent = note;
         }
       }
       if (e.target.matches('.delete-note-btn')) {
@@ -251,20 +257,23 @@
         const code = stations[i].code;
         const doc  = db.collection('notes').doc(code);
         const snap = await doc.get();
-        tempDel[code] = snap.exists ? snap.data().text : '';
+        tempDel[code]= snap.exists? snap.data().text:'';
         await doc.delete();
-        document.getElementById(`note-display-${i}`).textContent = '';
-        document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display = 'inline';
+        const disp = document.getElementById(`note-display-${i}`);
+        if (disp) disp.textContent = '';
+        document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display='inline';
       }
       if (e.target.matches('.undo-note-btn')) {
         e.preventDefault();
         const i    = e.target.dataset.idx;
         const code = stations[i].code;
+        const doc  = db.collection('notes').doc(code);
         const prev = tempDel[code];
-        if (prev !== undefined) {
-          await db.collection('notes').doc(code).set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() });
-          document.getElementById(`note-display-${i}`).textContent = prev;
-          e.target.style.display = 'none';
+        if (prev!==undefined) {
+          await doc.set({ text: prev, updated:firebase.firestore.FieldValue.serverTimestamp() });
+          const disp = document.getElementById(`note-display-${i}`);
+          if (disp) disp.textContent = prev;
+          e.target.style.display='none';
           delete tempDel[code];
         }
       }
