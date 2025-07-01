@@ -24,7 +24,8 @@
 
     /* Zoom controls below seal */
     .leaflet-control-zoom.leaflet-bar {
-      position:absolute!important; top:80px!important; left:10px!important; z-index:1000;
+      position:absolute!important;
+      top:80px!important; left:10px!important; z-index:1000;
     }
 
     /* Share & Install */
@@ -41,7 +42,8 @@
     #title {
       position:absolute; top:10px; left:80px; right:5%;
       background:#fff; padding:6px; border-radius:6px;
-      font-size:18px; font-weight:bold; text-align:center; z-index:900;
+      font-size:18px; font-weight:bold; text-align:center;
+      z-index:900;
     }
 
     /* Dropdown */
@@ -91,9 +93,8 @@
   <!-- Leaflet & Firebase SDKs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <!-- Analytics SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <script>
     // ─── Firebase init ─────────────────────────────────────────────────
@@ -101,18 +102,16 @@
       apiKey:    "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:"sd3ps-map.firebaseapp.com",
       projectId: "sd3ps-map",
-      measurementId: "G-HHX1X8KFSF"             // ← your measurementId
+      measurementId: "G-HHX1X8KFSF"
     });
-    // Initialize analytics
-    firebase.analytics();
-
+    firebase.analytics();               // ← Analytics is now on
     const db = firebase.firestore();
 
     // ─── Grab buttons & inputs ─────────────────────────────────────────
-    const installBtn   = document.getElementById('installBtn'),
-          shareBtn     = document.getElementById('shareBtn'),
-          closeShare   = document.getElementById('closeShare'),
-          stationSelect= document.getElementById('stationSelect');
+    const installBtn    = document.getElementById('installBtn'),
+          shareBtn      = document.getElementById('shareBtn'),
+          closeShareBtn = document.getElementById('closeShare'),
+          stationSelect = document.getElementById('stationSelect');
 
     // ─── PWA install prompt ─────────────────────────────────────────────
     let deferredPrompt;
@@ -132,14 +131,13 @@
     shareBtn.addEventListener('click', () => {
       document.getElementById('shareOverlay').style.display = 'flex';
     });
-    closeShare.addEventListener('click', () => {
+    closeShareBtn.addEventListener('click', () => {
       document.getElementById('shareOverlay').style.display = 'none';
     });
 
     // ─── Service Worker (install only) ─────────────────────────────────
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .catch(console.error);
+      navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
     // ─── Pump station data ──────────────────────────────────────────────
@@ -190,7 +188,6 @@
         .addTo(map)
         .bindPopup(popupHTML);
 
-      // pan/zoom then re-open popup
       m.on('click', () => {
         map.once('moveend', () => m.openPopup());
         map.setView([st.lat, st.lon], 17, { animate:true, duration:0.8 });
@@ -198,7 +195,6 @@
 
       markers.push(m);
 
-      // dropdown option
       const opt = document.createElement('option');
       opt.value = i;
       opt.text  = `${st.code} – ${st.address}`;
@@ -230,6 +226,7 @@
 
     // ─── Delegate Add/Edit/Delete/Undo ─────────────────────────────────
     document.body.addEventListener('click', async e => {
+      // Add/Edit Note
       if (e.target.matches('.note-btn')) {
         e.preventDefault();
         const i    = e.target.dataset.idx;
@@ -247,6 +244,8 @@
           if (disp) disp.textContent = note;
         }
       }
+
+      // Delete Note
       if (e.target.matches('.delete-note-btn')) {
         e.preventDefault();
         const i    = e.target.dataset.idx;
@@ -259,6 +258,8 @@
         if (disp) disp.textContent = '';
         document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display = 'inline';
       }
+
+      // Undo Delete
       if (e.target.matches('.undo-note-btn')) {
         e.preventDefault();
         const i    = e.target.dataset.idx;
