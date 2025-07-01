@@ -11,12 +11,14 @@
 
   <style>
     body { margin:0; padding:0; font-family:sans-serif; }
-    #map { height:60vh; }
-    #stationsTable { height:40vh; overflow-y:auto; }
+    #map { height:40vh; }              /* made smaller */
+    #stationsTable { height:60vh;      /* made larger */
+                     overflow-y:auto; }
     #stationsTable table { width:100%; border-collapse:collapse; }
     th, td { border:1px solid #ccc; padding:6px; text-align:left; }
     th { background:#f5f5f5; }
-    tr:hover { background:#fafafa; }
+    tr:hover { background:#fafafa; cursor:pointer; }
+    tr.selected { background:#d0eaff; } /* highlight */
     button { margin:0 4px; }
     input.editing { width:100%; box-sizing:border-box; }
   </style>
@@ -30,11 +32,7 @@
     <table>
       <thead>
         <tr>
-          <th>Code</th>
-          <th>Address</th>
-          <th>Lat</th>
-          <th>Lon</th>
-          <th>Actions</th>
+          <th>Code</th><th>Address</th><th>Lat</th><th>Lon</th><th>Actions</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -64,7 +62,7 @@
     const db        = firebase.firestore();
     const col       = db.collection('pumpStations');
 
-    // ─── Map + search
+    // ─── Map + geocoder
     const map = L.map('map').setView([40.730889, -73.284654], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
@@ -73,9 +71,15 @@
       .on('markgeocode', e => map.setView(e.geocode.center, 17))
       .addTo(map);
 
-    // ─── Data holders
+    // ─── Data holders & helpers
     const markers = [], docs = [], tempDel = {};
     const tbody = document.querySelector('#stationsTable tbody');
+
+    function highlightRow(idx) {
+      Array.from(tbody.children).forEach((tr,i) => {
+        tr.classList.toggle('selected', i === idx);
+      });
+    }
 
     // ─── Render one station
     async function addStation(doc, idx) {
@@ -83,7 +87,7 @@
       const { address, lat, lon } = doc.data();
       docs[idx] = doc;
 
-      // --- table row
+      // build row (read-only)
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="codeCell">${code}</td>
@@ -96,10 +100,13 @@
         </td>`;
       tbody.appendChild(tr);
 
-      // click row → open popup
-      tr.addEventListener('click', () => markers[idx].fire('click'));
+      // clicking row highlights & pops up
+      tr.addEventListener('click', () => {
+        markers[idx].fire('click');
+        highlightRow(idx);
+      });
 
-      // --- marker + popup
+      // marker + popup
       const m = L.marker([lat, lon]).addTo(map);
       markers[idx] = m;
       m.on('click', async () => {
@@ -120,19 +127,20 @@
           </div>`;
         map.once('moveend', () => m.bindPopup(popup).openPopup());
         map.setView([lat, lon], 17, { animate:true, duration:0.8 });
+        highlightRow(idx);
       });
     }
 
-    // ─── Load all stations
-    const snapshot = await col.get();
-    snapshot.docs.forEach((doc,i) => addStation(doc,i));
+    // ─── Load & render all
+    const snap = await col.get();
+    snap.docs.forEach((doc,i) => addStation(doc,i));
 
-    // ─── Table actions: Edit / Delete
+    // ─── Table: Edit / Delete
     tbody.addEventListener('click', async e => {
       const idx = +e.target.dataset.idx;
       if (e.target.matches('.edit-btn')) {
         const tr = tbody.children[idx];
-        // swap to inputs
+        // switch to inputs + Save/Cancel
         const code = tr.querySelector('.codeCell').textContent;
         const addr = tr.querySelector('.addrCell').textContent;
         const lat  = tr.querySelector('.latCell').textContent;
@@ -157,10 +165,10 @@
       }
     });
 
-    // ─── Save / Cancel after editing
+    // ─── After Edit: Save / Cancel
     tbody.addEventListener('click', async e => {
       const idx = +e.target.dataset.idx;
-      const tr = tbody.children[idx];
+      const tr  = tbody.children[idx];
       if (e.target.matches('.save-btn')) {
         const code = tr.children[0].textContent;
         const newAddr = tr.querySelector('.edit-addr').value.trim();
@@ -175,7 +183,7 @@
       }
     });
 
-    // ─── Popup note & adjust-pin handling
+    // ─── Popup: Notes & Adjust-Pin
     document.body.addEventListener('click', async e => {
       const idx = +e.target.dataset.idx;
       if (isNaN(idx)) return;
@@ -186,7 +194,7 @@
         e.preventDefault();
         const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
         const txt = prompt(`Note for ${code}:`, cur);
-        if (txt!==null){
+        if (txt!==null) {
           await db.collection('notes').doc(code)
             .set({ text:txt, updated:firebase.firestore.FieldValue.serverTimestamp() });
           document.getElementById(`note-display-${idx}`).textContent = txt;
@@ -195,8 +203,8 @@
       // Delete note
       if (e.target.matches('.del-note')) {
         e.preventDefault();
-        const snapN = await db.collection('notes').doc(code).get();
-        tempDel[code] = snapN.exists ? snapN.data().text : '';
+        const snapshot = await db.collection('notes').doc(code).get();
+        tempDel[code] = snapshot.exists ? snapshot.data().text : '';
         await db.collection('notes').doc(code).delete();
         document.getElementById(`note-display-${idx}`).textContent = '';
         e.target.nextElementSibling.style.display = 'inline';
@@ -219,14 +227,13 @@
           e.target.textContent = 'Save Pin';
         } else {
           m.dragging.disable();
-          const {lat, lng} = m.getLatLng();
+          const {lat,lng} = m.getLatLng();
           await col.doc(code).update({ lat, lon:lng });
           alert('Pin moved');
           location.reload();
         }
       }
     });
-
   })();
   </script>
 </body>
