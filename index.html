@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0066cc">
-  <!-- Leaflet CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -14,45 +13,39 @@
   <style>
     body { margin:0; padding:0; }
     #map { height:100vh; }
-    /* small “Admin” link right of the dropdown */
+    /* Admin link in top-right */
     #adminLink {
-      position:absolute; top:50px; right:15px;
-      font-size:12px; background:rgba(255,255,255,0.8);
+      position: absolute; top:10px; right:15px;
+      font-size:12px; color:#0066cc;
+      text-decoration:none; background:rgba(255,255,255,0.8);
       padding:2px 6px; border-radius:4px; z-index:1001;
-      color:#0066cc; text-decoration:none;
     }
     #adminLink:hover { background:rgba(0,102,204,0.1); }
-    /* county seal */
-    #seal {
-      position:absolute; top:10px; left:10px;
-      width:70px; z-index:1000;
-    }
-    /* zoom controls under seal */
+    /* seal, zoom controls, buttons, title, dropdown, overlay styling */
+    #seal { position:absolute; top:10px; left:10px; width:70px; z-index:1000; }
     .leaflet-control-zoom.leaflet-bar {
       position:absolute!important; top:80px!important; left:10px!important; z-index:1000;
     }
-    /* share / install buttons */
     #shareBtn,#installBtn {
       position:absolute; left:80px; z-index:1000;
-      background:#0066cc;color:#fff;border:none;border-radius:4px;
-      padding:8px 12px; font-size:14px; cursor:pointer;
+      background:#0066cc; color:#fff; padding:8px 12px;
+      border:none; border-radius:4px; font-size:14px;
+      cursor:pointer;
     }
-    #shareBtn { top:85px; } 
+    #shareBtn { top:85px; }
     #installBtn { top:120px; display:none; }
-    /* title bar */
     #title {
       position:absolute; top:10px; left:80px; right:5%;
       background:#fff; padding:6px; border-radius:6px;
-      font-size:18px; font-weight:bold; text-align:center; z-index:900;
+      font-size:18px; font-weight:bold; text-align:center;
+      z-index:900;
     }
-    /* station dropdown */
     #stationSelect {
       position:absolute!important; top:50px!important; left:80px!important;
-      width:calc(100% - 140px)!important; max-width:300px;
+      width:calc(100% - 90px)!important; max-width:300px;
       background:#fff; padding:6px; border-radius:6px;
       font-size:14px; z-index:900;
     }
-    /* share overlay */
     #shareOverlay {
       position:fixed; top:0; left:0; width:100%; height:100%;
       background:rgba(0,0,0,0.7); display:none;
@@ -63,14 +56,15 @@
     }
     #shareOverlayContent img { max-width:80vw; }
     #closeShare {
-      margin-top:10px; padding:8px 12px; background:#333; color:#fff;
-      border:none; border-radius:4px; cursor:pointer;
+      margin-top:10px; padding:8px 12px;
+      background:#333; color:#fff; border:none; border-radius:4px;
+      cursor:pointer;
     }
   </style>
 </head>
 <body>
 
-  <!-- Admin link -->
+  <!-- small Admin link -->
   <a id="adminLink" href="https://sd3psmaps.netlify.app/admin" target="_blank">Admin</a>
 
   <!-- Seal + Buttons -->
@@ -80,9 +74,7 @@
 
   <!-- Title + Dropdown -->
   <div id="title">Sewer District 3 Pump Station Map</div>
-  <select id="stationSelect">
-    <option value="">Select Pump Station</option>
-  </select>
+  <select id="stationSelect"><option value="">Select Pump Station</option></select>
 
   <!-- Share Overlay -->
   <div id="shareOverlay">
@@ -103,7 +95,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
   <script>
-    // ─── Firebase init ─────────────────────────────────────────────────
+    // Firebase init
     firebase.initializeApp({
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -116,13 +108,13 @@
     const analytics = firebase.analytics();
     const db        = firebase.firestore();
 
-    // ─── DOM refs ───────────────────────────────────────────────────────
+    // DOM refs
     const installBtn    = document.getElementById('installBtn'),
           shareBtn      = document.getElementById('shareBtn'),
           closeShare    = document.getElementById('closeShare'),
           stationSelect = document.getElementById('stationSelect');
 
-    // ─── PWA install prompt ─────────────────────────────────────────────
+    // PWA install prompt
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
@@ -136,7 +128,7 @@
       deferredPrompt = null;
     });
 
-    // ─── Share overlay toggle ────────────────────────────────────────────
+    // Share overlay toggle
     shareBtn.addEventListener('click', () => {
       analytics.logEvent('share_click');
       document.getElementById('shareOverlay').style.display = 'flex';
@@ -145,12 +137,12 @@
       document.getElementById('shareOverlay').style.display = 'none';
     });
 
-    // ─── ServiceWorker ──────────────────────────────────────────────────
+    // ServiceWorker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // ─── Map setup ─────────────────────────────────────────────────────
+    // Map setup
     const map     = L.map('map').setView([40.730889, -73.284654], 12),
           markers = [],
           tempDel = {};
@@ -159,30 +151,33 @@
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // ─── Load & render stations ────────────────────────────────────────
-    async function loadStations(){
+    // Load & build stations
+    async function loadStations() {
+      markers.forEach(m => map.removeLayer(m));
+      markers.length = 0;
       stationSelect.innerHTML = '<option value="">Select Pump Station</option>';
+
       const snap = await db.collection('pumpStations').get();
-      snap.docs.forEach((doc,i) => {
+      snap.docs.forEach((doc, i) => {
         const { address, lat, lon } = doc.data();
         const code = doc.id;
 
         // dropdown
-        stationSelect.appendChild(
-          new Option(`${code} – ${address}`, i)
-        );
+        const opt = new Option(`${code} – ${address}`, i);
+        stationSelect.appendChild(opt);
 
-        // marker + click
+        // marker
         const m = L.marker([lat, lon]).addTo(map);
         markers.push(m);
         m.on('click', () => openPopup(i, code, address, lat, lon, m));
       });
     }
 
-    // ─── Popup builder & display immediately ───────────────────────────
-    async function openPopup(i, code, address, lat, lon, marker){
-      const noteSnap = await db.collection('notes').doc(code).get();
-      const note = noteSnap.exists ? noteSnap.data().text : '';
+    // Simplified popup: bind & open immediately, then pan/zoom
+    async function openPopup(i, code, address, lat, lon, marker) {
+      const ns   = await db.collection('notes').doc(code).get();
+      const note = ns.exists ? ns.data().text : '';
+
       const html = `
         <strong>${code}</strong><br>
         ${address}<br>
@@ -193,14 +188,16 @@
         | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo</a>
         <br>
         <div id="note-display-${i}"
-             style="margin-top:6px;font-style:italic;color:#555;">
-          ${note}
-        </div>`;
-      marker.setPopupContent(html).openPopup();
+             style="margin-top:6px;font-style:italic;color:#555;">${note}</div>
+      `;
+
+      // show popup immediately
+      marker.bindPopup(html).openPopup();
+      // then pan & zoom
       map.setView([lat, lon], 17, { animate:true, duration:0.8 });
     }
 
-    // ─── Dropdown → marker click ───────────────────────────────────────
+    // dropdown selects marker
     stationSelect.addEventListener('change', () => {
       const i = +stationSelect.value;
       if (i >= 0) {
@@ -209,49 +206,47 @@
       }
     });
 
-    // ─── Notes CRUD & Undo ─────────────────────────────────────────────
+    // notes CRUD & undo inside popup
     document.body.addEventListener('click', async e => {
-      const idx = +e.target.dataset.idx;
-      if (isNaN(idx)) return;
-      const code = stationSelect.options[idx+1].text.split(' – ')[0];
+      if (!e.target.dataset.idx) return;
+      const i    = +e.target.dataset.idx;
+      const code = stationSelect.options[i+1].text.split(' – ')[0];
 
-      // Add/Edit
-      if (e.target.matches('.note-btn')){
+      if (e.target.matches('.note-btn')) {
         e.preventDefault();
-        analytics.logEvent('edit_note',{station:code});
-        const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
-        const txt = prompt(`Note for ${code}:`,cur);
-        if (txt!==null){
-          await db.collection('notes').doc(code)
-            .set({ text:txt, updated:firebase.firestore.FieldValue.serverTimestamp() });
-          document.getElementById(`note-display-${idx}`).textContent = txt;
+        const cur = (await db.collection('notes').doc(code).get()).data()?.text || '';
+        const txt = prompt(`Note for ${code}:`, cur);
+        if (txt!==null) {
+          await db.collection('notes').doc(code).set({
+            text: txt,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          document.getElementById(`note-display-${i}`).textContent = txt;
         }
       }
 
-      // Delete
-      if (e.target.matches('.delete-note-btn')){
+      if (e.target.matches('.delete-note-btn')) {
         e.preventDefault();
-        analytics.logEvent('delete_note',{station:code});
-        const snapN = await db.collection('notes').doc(code).get();
-        tempDel[code] = snapN.exists ? snapN.data().text : '';
+        const docSnap = await db.collection('notes').doc(code).get();
+        tempDel[code] = docSnap.exists ? docSnap.data().text : '';
         await db.collection('notes').doc(code).delete();
-        document.getElementById(`note-display-${idx}`).textContent = '';
-        document.querySelector(`.undo-note-btn[data-idx="${idx}"]`).style.display='inline';
+        document.getElementById(`note-display-${i}`).textContent = '';
+        e.target.nextElementSibling.style.display = 'inline';
       }
 
-      // Undo
-      if (e.target.matches('.undo-note-btn')){
+      if (e.target.matches('.undo-note-btn')) {
         e.preventDefault();
-        analytics.logEvent('undo_delete_note',{station:code});
-        await db.collection('notes').doc(code)
-          .set({ text:tempDel[code], updated:firebase.firestore.FieldValue.serverTimestamp() });
-        document.getElementById(`note-display-${idx}`).textContent = tempDel[code];
-        e.target.style.display='none';
+        await db.collection('notes').doc(code).set({
+          text: tempDel[code],
+          updated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        document.getElementById(`note-display-${i}`).textContent = tempDel[code];
+        e.target.style.display = 'none';
         delete tempDel[code];
       }
     });
 
-    // ─── Kick things off ───────────────────────────────────────────────
+    // kick it off
     loadStations();
   </script>
 </body>
