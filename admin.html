@@ -22,8 +22,8 @@
   <style>
     body { font-family:sans-serif; margin:20px; }
     h1 { margin-bottom:10px; }
-    form   { margin-bottom:10px; }
-    input  { margin-right:8px; }
+    form { margin-bottom:10px; }
+    input { margin-right:8px; }
     #adminMap { height:300px; margin-bottom:20px; border:1px solid #ccc; }
     table { border-collapse:collapse; width:100%; }
     th,td { border:1px solid #ccc; padding:8px; }
@@ -35,14 +35,14 @@
   <h1>Pump Stations Admin</h1>
 
   <form id="addForm">
-    <input type="text" id="newCode"    placeholder="Code (e.g. PS#315)" required>
-    <input type="text" id="newAddress" placeholder="Address" required>
-    <input type="number" id="newLat"    placeholder="Latitude" step="any" required>
-    <input type="number" id="newLon"    placeholder="Longitude" step="any" required>
+    <input type="text"   id="newCode"    placeholder="Code (e.g. PS#315)" required>
+    <input type="text"   id="newAddress" placeholder="Address" required>
+    <input type="number" id="newLat"     placeholder="Latitude" step="any" required>
+    <input type="number" id="newLon"     placeholder="Longitude" step="any" required>
     <button type="submit">Add Station</button>
   </form>
 
-  <!-- map for geocoding & pin placement -->
+  <!-- map for search & new-station pin -->
   <div id="adminMap"></div>
 
   <table id="stationsTable">
@@ -85,39 +85,44 @@
       attribution:'© OpenStreetMap contributors'
     }).addTo(adminMap);
 
-    let adminMarker = null;
-    const geocoder = L.Control.geocoder({
-      defaultMarkGeocode: false
-    })
-    .on('markgeocode', e => {
-      const center = e.geocode.center;
+    let adminMarker = null,
+        editTarget  = null;
 
-      // remove old marker
+    // place a draggable marker; if targetRow supplied, sync drag→row
+    function placeAdminMarker(lat, lng, targetRow = null) {
       if (adminMarker) adminMap.removeLayer(adminMarker);
-
-      // place new draggable marker
-      adminMarker = L.marker(center, { draggable:true }).addTo(adminMap);
-
-      // fill form fields
-      newAddress.value = e.geocode.name;
-      newLat.value     = center.lat.toFixed(6);
-      newLon.value     = center.lng.toFixed(6);
-
-      adminMap.fitBounds(e.geocode.bbox);
-
-      // update coords on drag
-      adminMarker.on('dragend', () => {
-        const p = adminMarker.getLatLng();
-        newLat.value = p.lat.toFixed(6);
-        newLon.value = p.lng.toFixed(6);
+      adminMarker = L.marker([lat, lng], { draggable:true }).addTo(adminMap);
+      adminMap.setView([lat, lng], 17);
+      editTarget = targetRow;
+      adminMarker.on('dragend', e => {
+        const p = e.target.getLatLng();
+        if (editTarget) {
+          const inputs = editTarget.querySelectorAll('input');
+          inputs[2].value = p.lat.toFixed(6);
+          inputs[3].value = p.lng.toFixed(6);
+        } else {
+          newLat.value = p.lat.toFixed(6);
+          newLon.value = p.lng.toFixed(6);
+        }
       });
-    })
-    .addTo(adminMap);
+    }
+
+    // add-address geocoder
+    L.Control.geocoder({ defaultMarkGeocode:false })
+      .on('markgeocode', e=>{
+        const c = e.geocode.center;
+        newAddress.value = e.geocode.name;
+        newLat.value     = c.lat.toFixed(6);
+        newLon.value     = c.lng.toFixed(6);
+        placeAdminMarker(c.lat, c.lng);
+      })
+      .addTo(adminMap);
 
     // ─── Render station rows ──────────────────────────────────────────
     function renderRow(doc) {
       const tr = document.createElement('tr');
       tr.dataset.id = doc.id;
+
       tr.innerHTML = `
         <td><input value="${doc.id}" /></td>
         <td><input value="${doc.data().address}" /></td>
@@ -126,45 +131,62 @@
         <td>
           <button class="save">Save</button>
           <button class="delete">Delete</button>
+          <button class="editMap">Edit on Map</button>
         </td>
       `;
-      // save / delete...
-      tr.querySelector('.save').onclick = async () => {
+
+      // Save
+      tr.querySelector('.save').onclick = async ()=>{
         const [c,a,lt,ln] = tr.querySelectorAll('input');
         const newC = c.value.trim(),
               newA = a.value.trim(),
               newL = parseFloat(lt.value),
               newG = parseFloat(ln.value);
-        if(newC!==doc.id) {
-          await col.doc(newC).set({ code:newC,address:newA,lat:newL,lon:newG });
+        if (newC!==doc.id) {
+          await col.doc(newC).set({ address:newA, lat:newL, lon:newG });
           await col.doc(doc.id).delete();
           tr.dataset.id = newC;
         } else {
-          await col.doc(doc.id).update({ address:newA,lat:newL,lon:newG });
+          await col.doc(doc.id).update({ address:newA, lat:newL, lon:newG });
         }
         alert('Saved');
       };
-      tr.querySelector('.delete').onclick = async () => {
-        if(confirm(`Delete "${doc.id}"?`)) {
+
+      // Delete
+      tr.querySelector('.delete').onclick = async ()=>{
+        if (confirm(`Delete "${doc.id}"?`)) {
           await col.doc(doc.id).delete();
           tr.remove();
         }
       };
+
+      // "Edit on Map"
+      tr.querySelector('.editMap').onclick = () => {
+        const inputs = tr.querySelectorAll('input');
+        placeAdminMarker(
+          parseFloat(inputs[2].value),
+          parseFloat(inputs[3].value),
+          tr
+        );
+      };
+
       tbody.appendChild(tr);
     }
 
     // ─── Load existing stations ────────────────────────────────────────
-    col.get().then(snap => snap.forEach(d=>renderRow(d)));
+    col.get().then(snapshot=>{
+      snapshot.forEach(doc=> renderRow(doc) );
+    });
 
-    // ─── Add form handler ─────────────────────────────────────────────
-    addForm.onsubmit = async e => {
+    // ─── Add new station handler ──────────────────────────────────────
+    addForm.onsubmit = async e=>{
       e.preventDefault();
       const code = newCode.value.trim();
       if(!code) return alert('Code required');
       await col.doc(code).set({
-        address:newAddress.value,
-        lat:parseFloat(newLat.value),
-        lon:parseFloat(newLon.value)
+        address: newAddress.value,
+        lat:     parseFloat(newLat.value),
+        lon:     parseFloat(newLon.value)
       });
       const d = await col.doc(code).get();
       renderRow(d);
