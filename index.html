@@ -106,7 +106,7 @@
     // ─── Map setup ─────────────────────────────────────────────────────
     const map     = L.map('map').setView([40.730889, -73.284654], 12),
           markers = [],
-          tempDel = {}; // for undo‐delete-note
+          tempDel = {};
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
@@ -126,13 +126,16 @@
         const code = doc.id;
 
         // dropdown
-        const opt = new Option(`${code} – ${address}`, i);
-        stationSelect.appendChild(opt);
+        stationSelect.appendChild(
+          new Option(`${code} – ${address}`, i)
+        );
 
-        // marker
-        const m = L.marker([lat, lon]).addTo(map).bindPopup('');
+        // marker — no bindPopup('') here!
+        const m = L.marker([lat, lon]).addTo(map);
         markers.push(m);
-        m.on('click', () => openPopup(i, code, address, lat, lon, m));
+        m.on('click', () =>
+          openPopup(i, code, address, lat, lon, m)
+        );
       });
     }
 
@@ -152,33 +155,31 @@
         <div id="note-display-${i}"
              style="margin-top:6px;font-style:italic;color:#555;">${note}</div>
       `;
-      map.once('moveend', () => marker.setPopupContent(html).openPopup());
+      map.once('moveend', () =>
+        marker.bindPopup(html).openPopup()
+      );
       map.setView([lat, lon], 17, { animate:true, duration:0.8 });
     }
 
     // ─── Dropdown → trigger marker click ────────────────────────────────
     stationSelect.addEventListener('change', () => {
       const i = +stationSelect.value;
-      if (i >= 0) {
-        analytics.logEvent('select_station');
-        markers[i].fire('click');
-      }
+      if (i >= 0) markers[i].fire('click');
     });
 
     // ─── Notes CRUD & Undo ─────────────────────────────────────────────
     document.body.addEventListener('click', async e => {
       if (!e.target.dataset.idx) return;
       const i    = +e.target.dataset.idx;
-      const opt  = stationSelect.options[i+1].text; // +1 b/c first is placeholder
-      const code = opt.split(' – ')[0];
+      const text = stationSelect.options[i+1].text;
+      const code = text.split(' – ')[0];
 
-      // Add/Edit Note
       if (e.target.matches('.note-btn')) {
         e.preventDefault();
-        analytics.logEvent('edit_note', { station: code });
-        const cur = (await db.collection('notes').doc(code).get()).data()?.text || '';
+        analytics.logEvent('edit_note',{station:code});
+        const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
         const txt = prompt(`Note for ${code}:`, cur);
-        if (txt !== null) {
+        if (txt!==null){
           await db.collection('notes').doc(code).set({
             text: txt,
             updated: firebase.firestore.FieldValue.serverTimestamp()
@@ -186,33 +187,29 @@
           document.getElementById(`note-display-${i}`).textContent = txt;
         }
       }
-
-      // Delete Note
       if (e.target.matches('.delete-note-btn')) {
         e.preventDefault();
-        analytics.logEvent('delete_note', { station: code });
-        const doc = await db.collection('notes').doc(code).get();
-        tempDel[code] = doc.exists ? doc.data().text : '';
+        analytics.logEvent('delete_note',{station:code});
+        const snap = await db.collection('notes').doc(code).get();
+        tempDel[code] = snap.exists ? snap.data().text : '';
         await db.collection('notes').doc(code).delete();
         document.getElementById(`note-display-${i}`).textContent = '';
-        document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display = 'inline';
+        document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display='inline';
       }
-
-      // Undo Delete
       if (e.target.matches('.undo-note-btn')) {
         e.preventDefault();
-        analytics.logEvent('undo_delete_note', { station: code });
+        analytics.logEvent('undo_delete_note',{station:code});
         await db.collection('notes').doc(code).set({
           text: tempDel[code],
           updated: firebase.firestore.FieldValue.serverTimestamp()
         });
         document.getElementById(`note-display-${i}`).textContent = tempDel[code];
-        e.target.style.display = 'none';
+        e.target.style.display='none';
         delete tempDel[code];
       }
     });
 
-    // ─── Initialize everything ─────────────────────────────────────────
+    // ─── Kick everything off ───────────────────────────────────────────
     loadStations();
   </script>
 </body>
