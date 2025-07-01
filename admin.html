@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Admin – Pump Stations</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    body { font-family: sans-serif; margin:20px; }
+    h1 { margin-bottom:10px; }
+    table { border-collapse: collapse; width:100%; margin-bottom:20px; }
+    th, td { border:1px solid #ccc; padding:8px; text-align:left; }
+    th { background:#f5f5f5; }
+    input { width: 100%; box-sizing: border-box; }
+    button { margin-right:8px; }
+    #addForm input { width:auto; margin-right:8px; }
+  </style>
+</head>
+<body>
+  <h1>Pump Stations Admin</h1>
+
+  <form id="addForm">
+    <input type="text" id="newCode" placeholder="Code (e.g. PS#315)" required>
+    <input type="text" id="newAddress" placeholder="Address" required>
+    <input type="number" id="newLat" placeholder="Latitude" step="any" required>
+    <input type="number" id="newLon" placeholder="Longitude" step="any" required>
+    <button type="submit">Add Station</button>
+  </form>
+
+  <table id="stationsTable">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Address</th>
+        <th>Latitude</th>
+        <th>Longitude</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- rows injected here -->
+    </tbody>
+  </table>
+
+  <script>
+    // ─── Firebase init ─────────────────────────────────────────────────
+    firebase.initializeApp({
+      apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
+      authDomain:        "sd3ps-map.firebaseapp.com",
+      projectId:         "sd3ps-map",
+      storageBucket:     "sd3ps-map.appspot.com",
+      messagingSenderId: "14976888367",
+      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
+      measurementId:     "G-HHX1X8KFSF"
+    });
+    const db = firebase.firestore();
+    const col = db.collection('pumpStations');
+
+    const tableBody = document.querySelector('#stationsTable tbody');
+    const addForm   = document.getElementById('addForm');
+
+    // ─── Render one row ────────────────────────────────────────────────
+    function renderRow(doc, index){
+      const tr = document.createElement('tr');
+      tr.dataset.id = doc.id;
+
+      // make cells editable inputs
+      tr.innerHTML = `
+        <td><input value="${doc.id}" /></td>
+        <td><input value="${doc.data().address}" /></td>
+        <td><input value="${doc.data().lat}" type="number" step="any" /></td>
+        <td><input value="${doc.data().lon}" type="number" step="any" /></td>
+        <td>
+          <button class="save">Save</button>
+          <button class="delete">Delete</button>
+        </td>
+      `;
+
+      // Save handler
+      tr.querySelector('.save').onclick = async () => {
+        const inputs = tr.querySelectorAll('input');
+        const newCode    = inputs[0].value.trim();
+        const newAddress = inputs[1].value.trim();
+        const newLat     = parseFloat(inputs[2].value);
+        const newLon     = parseFloat(inputs[3].value);
+
+        // If code (doc.id) changed, we need to copy+delete
+        if (newCode !== doc.id){
+          const data = { code: newCode, address:newAddress, lat:newLat, lon:newLon };
+          await col.doc(newCode).set(data);
+          await col.doc(doc.id).delete();
+          tr.dataset.id = newCode;
+        } else {
+          await col.doc(doc.id).update({
+            address:newAddress,
+            lat:newLat,
+            lon:newLon
+          });
+        }
+        alert('Saved');
+      };
+
+      // Delete handler
+      tr.querySelector('.delete').onclick = async () => {
+        if (confirm(`Delete station "${doc.id}"?`)){
+          await col.doc(doc.id).delete();
+          tr.remove();
+        }
+      };
+
+      tableBody.appendChild(tr);
+    }
+
+    // ─── Load all stations on startup ─────────────────────────────────
+    col.get().then(snapshot => {
+      snapshot.forEach((doc,i) => renderRow(doc,i));
+    });
+
+    // ─── Add new station form ─────────────────────────────────────────
+    addForm.onsubmit = async e => {
+      e.preventDefault();
+      const code    = document.getElementById('newCode').value.trim();
+      const address = document.getElementById('newAddress').value.trim();
+      const lat     = parseFloat(document.getElementById('newLat').value);
+      const lon     = parseFloat(document.getElementById('newLon').value);
+
+      if(!code) return alert('Code required');
+      await col.doc(code).set({ code, address, lat, lon });
+      // re-render freshly:
+      const doc = await col.doc(code).get();
+      renderRow(doc);
+      addForm.reset();
+    };
+  </script>
+</body>
+</html>
