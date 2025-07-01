@@ -12,13 +12,20 @@
   />
   <style>
     body { margin:0; padding:0; }
-    #map { height:100vh; }
 
-    /* Admin link in top-right */
+    /* Admin link sits just right of the #stationSelect */
     #adminLink {
       position: absolute;
-      top: 10px;
-      right: 15px;
+      top: 50px; /* match the dropdown’s top */
+      left: calc(
+        80px /* same as #stationSelect’s left */
+        + clamp(
+            calc(100% - 90px),
+            300px,
+            calc(100% - 90px)
+          )
+        + 8px /* small gap */
+      );
       font-size: 12px;
       color: #0066cc;
       text-decoration: none;
@@ -30,6 +37,8 @@
     #adminLink:hover {
       background: rgba(0,102,204,0.1);
     }
+
+    #map { height:100vh; }
 
     /* seal, zoom controls, buttons, title, dropdown, overlay styling */
     #seal { position:absolute; top:10px; left:10px; width:70px; z-index:1000; }
@@ -56,7 +65,9 @@
 
   <!-- Title + Dropdown -->
   <div id="title">Sewer District 3 Pump Station Map</div>
-  <select id="stationSelect"><option value="">Select Pump Station</option></select>
+  <select id="stationSelect">
+    <option value="">Select Pump Station</option>
+  </select>
 
   <!-- Share Overlay -->
   <div id="shareOverlay">
@@ -127,7 +138,7 @@
     // ─── Map setup ─────────────────────────────────────────────────────
     const map     = L.map('map').setView([40.730889, -73.284654], 12),
           markers = [],
-          tempDel = {}; // for undo-delete-note
+          tempDel = {};
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
@@ -135,31 +146,29 @@
 
     // ─── Load & build from pumpStations collection ─────────────────────
     async function loadStations() {
-      // clear old
       markers.forEach(m => map.removeLayer(m));
       markers.length = 0;
       stationSelect.innerHTML = '<option value="">Select Pump Station</option>';
-
-      // fetch all
       const snap = await db.collection('pumpStations').get();
       snap.docs.forEach((doc, i) => {
         const { address, lat, lon } = doc.data();
         const code = doc.id;
-
         // dropdown
-        const opt = new Option(`${code} – ${address}`, i);
-        stationSelect.appendChild(opt);
-
+        stationSelect.appendChild(
+          new Option(`${code} – ${address}`, i)
+        );
         // marker
         const m = L.marker([lat, lon]).addTo(map).bindPopup('');
         markers.push(m);
-        m.on('click', () => openPopup(i, code, address, lat, lon, m));
+        m.on('click', () =>
+          openPopup(i, code, address, lat, lon, m)
+        );
       });
     }
 
     // ─── Popup builder & note-fetcher ──────────────────────────────────
     async function openPopup(i, code, address, lat, lon, marker) {
-      const ns = await db.collection('notes').doc(code).get();
+      const ns   = await db.collection('notes').doc(code).get();
       const note = ns.exists ? ns.data().text : '';
       const html = `
         <strong>${code}</strong><br>
@@ -191,16 +200,13 @@
     document.body.addEventListener('click', async e => {
       if (!e.target.dataset.idx) return;
       const i    = +e.target.dataset.idx;
-      const opt  = stationSelect.options[i+1].text; // +1 b/c first is placeholder
-      const code = opt.split(' – ')[0];
+      const code = stationSelect.options[i+1].text.split(' – ')[0];
 
-      // Add/Edit Note
       if (e.target.matches('.note-btn')) {
         e.preventDefault();
-        analytics.logEvent('edit_note', { station: code });
         const cur = (await db.collection('notes').doc(code).get()).data()?.text || '';
         const txt = prompt(`Note for ${code}:`, cur);
-        if (txt !== null) {
+        if (txt!==null) {
           await db.collection('notes').doc(code).set({
             text: txt,
             updated: firebase.firestore.FieldValue.serverTimestamp()
@@ -209,21 +215,17 @@
         }
       }
 
-      // Delete Note
       if (e.target.matches('.delete-note-btn')) {
         e.preventDefault();
-        analytics.logEvent('delete_note', { station: code });
-        const doc = await db.collection('notes').doc(code).get();
-        tempDel[code] = doc.exists ? doc.data().text : '';
+        const snapN = await db.collection('notes').doc(code).get();
+        tempDel[code] = snapN.exists ? snapN.data().text : '';
         await db.collection('notes').doc(code).delete();
         document.getElementById(`note-display-${i}`).textContent = '';
         document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display = 'inline';
       }
 
-      // Undo Delete
       if (e.target.matches('.undo-note-btn')) {
         e.preventDefault();
-        analytics.logEvent('undo_delete_note', { station: code });
         await db.collection('notes').doc(code).set({
           text: tempDel[code],
           updated: firebase.firestore.FieldValue.serverTimestamp()
@@ -234,7 +236,7 @@
       }
     });
 
-    // ─── Initialize everything ─────────────────────────────────────────
+    // ─── Initialize ────────────────────────────────────────────────────
     loadStations();
   </script>
 </body>
