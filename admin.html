@@ -4,11 +4,9 @@
   <meta charset="utf-8">
   <title>Pump Stations Admin</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-
-  <!-- Leaflet & Geocoder CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
-
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0066cc">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body { margin:0; padding:0; font-family:sans-serif; }
     h1 { margin:10px; }
@@ -23,12 +21,19 @@
   </style>
 </head>
 <body>
+
   <h1>Pump Stations Admin</h1>
   <div id="map"></div>
   <div id="stationsTable">
     <table>
       <thead>
-        <tr><th>Code</th><th>Address</th><th>Lat</th><th>Lon</th><th>Actions</th></tr>
+        <tr>
+          <th>Code</th>
+          <th>Address</th>
+          <th>Lat</th>
+          <th>Lon</th>
+          <th>Actions</th>
+        </tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -84,7 +89,8 @@
         <td><input class="lat"   type="number" step="any" value="${lat}"></td>
         <td><input class="lon"   type="number" step="any" value="${lon}"></td>
         <td>
-          <button class="save" data-idx="${idx}">Save</button>
+          <button class="edit" data-idx="${idx}">Edit</button>
+          <button class="save" data-idx="${idx}" style="display:none;">Save</button>
           <button class="del"  data-idx="${idx}">Delete</button>
         </td>`;
       tbody.appendChild(tr);
@@ -132,36 +138,44 @@
     const snap = await db.collection('pumpStations').get();
     snap.docs.forEach((doc,i) => addStation(doc,i));
 
-    // ─── Table Save / Delete ─────────────────────────────────────────
+    // ─── Table Edit / Save / Delete ─────────────────────────────────
     tbody.addEventListener('click', async e => {
       const idx = +e.target.dataset.idx;
-      if (e.target.matches('.save')){
-        const tr = tbody.children[idx];
-        const code      = tr.querySelector('.code').value;
-        const newAddr   = tr.querySelector('.addr').value.trim();
-        const newLat    = parseFloat(tr.querySelector('.lat').value);
-        const newLon    = parseFloat(tr.querySelector('.lon').value);
+      const tr = tbody.children[idx];
+      const [codeCell, addressCell, latCell, lonCell] = tr.children;
+      const code = codeCell.textContent.trim();
 
-        // 1) Write to Firestore
+      // Edit row
+      if (e.target.matches('.edit')) {
+        e.preventDefault();
+        tr.querySelectorAll('input').forEach(input => input.removeAttribute('disabled'));
+        e.target.style.display = 'none';
+        tr.querySelector('.save').style.display = 'inline-block';
+      }
+
+      // Save row changes
+      if (e.target.matches('.save')) {
+        e.preventDefault();
+        const newAddress = addressCell.querySelector('input').value.trim();
+        const newLat = parseFloat(latCell.querySelector('input').value);
+        const newLon = parseFloat(lonCell.querySelector('input').value);
+
         await db.collection('pumpStations').doc(code).update({
-          address:newAddr, lat:newLat, lon:newLon
+          address:newAddress, lat:newLat, lon:newLon
         });
 
-        // 2) Update in-memory and marker
-        docs[idx] = { id: code, data: ()=>({ address:newAddr, lat:newLat, lon:newLon }) };
-        markers[idx].setLatLng([newLat,newLon]);
+        // Update the map marker
+        markers[idx].setLatLng([newLat, newLon]);
 
-        // 3) If its popup is open, refresh it
-        const open = markers[idx].getPopup();
-        if (open && map.hasLayer(open)) {
-          markers[idx].fire('click');
-        }
-
+        tr.querySelectorAll('input').forEach(input => input.setAttribute('disabled', true));
+        e.target.style.display = 'none';
+        tr.querySelector('.edit').style.display = 'inline-block';
         alert('Saved');
       }
 
-      if (e.target.matches('.del')){
-        const code = tbody.children[idx].querySelector('.code').value;
+      // Delete row
+      if (e.target.matches('.del')) {
+        e.preventDefault();
         if (!confirm(`Delete ${code}?`)) return;
         await db.collection('pumpStations').doc(code).delete();
         location.reload(); // simplest on delete
@@ -173,6 +187,7 @@
       const idx = +e.target.dataset.idx;
       if (isNaN(idx)) return;
       const code = docs[idx].id;
+
       // Add/Edit
       if (e.target.matches('.note-btn')){
         e.preventDefault();
