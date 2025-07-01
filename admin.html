@@ -21,8 +21,7 @@
     tr.highlight { background:#d0eaff !important; }
     input { width:100%; box-sizing:border-box; }
     button { margin:0 4px; }
-    /* hide Save/Cancel until Edit pressed */
-    button.save, button.cancel { display:none; }
+    .hidden { display:none !important; }
   </style>
 </head>
 <body>
@@ -72,8 +71,16 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
-    L.Control.geocoder({ placeholder: 'Search address…' })
-      .on('markgeocode', e => map.setView(e.geocode.center, 17))
+    L.Control.geocoder({
+      defaultMarkGeocode: false,
+      placeholder: 'Search address…'
+    })
+      .on('markgeocode', e => {
+        map.setView(e.geocode.center, 17);
+        // drop a temp marker
+        L.marker(e.geocode.center).addTo(map)
+          .bindPopup(e.geocode.name).openPopup();
+      })
       .addTo(map);
 
     // ─── Data holders
@@ -96,13 +103,13 @@
         <td><input class="lon"   type="number" step="any" value="${lon}" disabled></td>
         <td>
           <button class="edit"  data-idx="${idx}">Edit</button>
-          <button class="save"  data-idx="${idx}">Save</button>
-          <button class="cancel"data-idx="${idx}">Cancel</button>
+          <button class="save hidden"  data-idx="${idx}">Save</button>
+          <button class="cancel hidden"data-idx="${idx}">Cancel</button>
           <button class="del"   data-idx="${idx}">Delete</button>
         </td>`;
       tbody.appendChild(tr);
 
-      // clicking row opens popup & highlights
+      // clicking row opens popup & highlight
       tr.addEventListener('click', () => {
         markers[idx].fire('click');
         document.querySelectorAll('tr').forEach(r=>r.classList.remove('highlight'));
@@ -110,12 +117,12 @@
         tr.classList.add('highlight');
       });
 
-      // create draggable marker but disabled
+      // create draggable marker but initially disabled
       const m = L.marker([lat, lon], { draggable:true }).addTo(map);
       m.dragging.disable();
       markers[idx] = m;
 
-      // popup on click
+      // popup on marker click
       m.on('click', async () => {
         const ns = await db.collection('notes').doc(code).get();
         const note = ns.exists ? ns.data().text : '';
@@ -150,9 +157,9 @@
         ['addr','lat','lon'].forEach(c=>{
           tr.querySelector('.'+c).disabled = false;
         });
-        tr.querySelector('.edit').style.display   = 'none';
-        tr.querySelector('.save').style.display   = '';
-        tr.querySelector('.cancel').style.display = '';
+        tr.querySelector('.edit').classList.add('hidden');
+        tr.querySelector('.save').classList.remove('hidden');
+        tr.querySelector('.cancel').classList.remove('hidden');
       }
       if (e.target.matches('.cancel')){
         location.reload();
@@ -179,8 +186,7 @@
     document.body.addEventListener('click', async e=>{
       const idx = +e.target.dataset.idx;
       if (isNaN(idx)) return;
-      const doc = docs[idx];
-      const code = doc.id;
+      const code = docs[idx].id;
 
       // Add/Edit note
       if (e.target.matches('.note-btn')){
@@ -191,7 +197,7 @@
           await db.collection('notes').doc(code).set({
             text:txt, updated:firebase.firestore.FieldValue.serverTimestamp()
           });
-          document.getElementById(`note-display-${idx}`).textContent=txt;
+          document.getElementById(`note-display-${idx}`).textContent = txt;
         }
       }
       // Delete note
@@ -207,8 +213,7 @@
       if (e.target.matches('.undo-note')){
         e.preventDefault();
         await db.collection('notes').doc(code).set({
-          text:tempDel[code],
-          updated:firebase.firestore.FieldValue.serverTimestamp()
+          text:tempDel[code], updated:firebase.firestore.FieldValue.serverTimestamp()
         });
         document.getElementById(`note-display-${idx}`).textContent=tempDel[code];
         e.target.style.display='none';
