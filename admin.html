@@ -13,82 +13,198 @@
     body { margin:0; padding:0; font-family:sans-serif; }
     #map { height:60vh; }
     #stationsTable { height:40vh; overflow-y:auto; }
-    table { width:100%; border-collapse:collapse; }
-    th, td { border:1px solid #ccc; padding:8px; }
+    #stationsTable table { width:100%; border-collapse:collapse; }
+    th, td { border:1px solid #ccc; padding:6px; }
     th { background:#f5f5f5; }
-    tr:hover { background:#fafafa; cursor:pointer; }
+    tr:hover { background:#fafafa; }
+    input { width:100%; box-sizing:border-box; }
+    button { margin:0 4px; }
   </style>
 </head>
 <body>
 
   <h1 style="margin:10px">Pump Stations Admin</h1>
   <div id="map"></div>
+
   <div id="stationsTable">
     <table>
       <thead>
-        <tr><th>Code</th><th>Address</th><th>Lat</th><th>Lon</th></tr>
+        <tr>
+          <th>Code</th>
+          <th>Address</th>
+          <th>Lat</th>
+          <th>Lon</th>
+          <th>Actions</th>
+        </tr>
       </thead>
       <tbody></tbody>
     </table>
   </div>
 
-  <!-- Scripts -->
+  <!-- Leaflet & Geocoder & Firebase SDKs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
   <script>
   (async function(){
-    // 1) Init Firebase
+    // Firebase
     firebase.initializeApp({
-      apiKey: "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
-      authDomain: "sd3ps-map.firebaseapp.com",
-      projectId: "sd3ps-map"
+      apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
+      authDomain:        "sd3ps-map.firebaseapp.com",
+      projectId:         "sd3ps-map",
+      storageBucket:     "sd3ps-map.appspot.com",
+      messagingSenderId: "14976888367",
+      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
+      measurementId:     "G-HHX1X8KFSF"
     });
-    const db = firebase.firestore();
+    const analytics = firebase.analytics();
+    const db        = firebase.firestore();
 
-    // 2) Init Map + Geocoder
-    const map = L.map('map').setView([40.73, -73.28], 12);
+    // Map + search
+    const map = L.map('map').setView([40.730889, -73.284654], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
-    L.Control.geocoder().addTo(map);
+    L.Control.geocoder({ placeholder: 'Search address…' })
+      .on('markgeocode', e => map.setView(e.geocode.center, 17))
+      .addTo(map);
 
-    // 3) Fetch stations & render
-    const tbody = document.querySelector('#stationsTable tbody');
-    const rowEls = [], markerEls = [];
+    // Data
+    const markers = [];
+    const docs    = [];
+    const tbody   = document.querySelector('#stationsTable tbody');
+    const tempDel = {};
 
-    const snap = await db.collection('pumpStations').get();
-    snap.docs.forEach((doc,i) => {
-      const { address, lat, lon } = doc.data();
+    // Add one station row + marker
+    async function addStation(doc, idx){
       const code = doc.id;
+      const { address, lat, lon } = doc.data();
+      docs[idx] = doc;
 
-      // Table row
+      // Row with <input>
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${code}</td><td>${address}</td>
-                      <td>${lat}</td><td>${lon}</td>`;
+      tr.innerHTML = `
+        <td><input class="code"  value="${code}" disabled></td>
+        <td><input class="addr"  value="${address}"></td>
+        <td><input class="lat"   type="number" step="any" value="${lat}"></td>
+        <td><input class="lon"   type="number" step="any" value="${lon}"></td>
+        <td>
+          <button class="save" data-idx="${idx}">Save</button>
+          <button class="del"  data-idx="${idx}">Delete</button>
+        </td>`;
       tbody.appendChild(tr);
-      rowEls[i] = tr;
+
+      // Clicking row fires popup
+      tr.addEventListener('click', () => markers[idx].fire('click'));
 
       // Marker
-      const marker = L.marker([lat, lon]).addTo(map);
-      markerEls[i] = marker;
-
-      // When marker clicked: open popup, scroll row into view
-      marker.on('click', () => {
-        marker.bindPopup(
-          `<strong>${code}</strong><br>${address}`
-        ).openPopup();
-        // scroll that table row into view
-        rowEls[i].scrollIntoView({ behavior:'smooth', block:'center' });
+      const m = L.marker([lat, lon]).addTo(map);
+      markers[idx] = m;
+      m.on('click', async () => {
+        const noteSnap = await db.collection('notes').doc(code).get();
+        const note     = noteSnap.exists ? noteSnap.data().text : '';
+        const popup = `
+          <strong>${code}</strong><br>
+          ${address}<br>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+             target="_blank">Navigate</a>
+          | <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
+          | <a href="#" class="del-note" data-idx="${idx}">Delete Note</a>
+          | <a href="#" class="undo-note" data-idx="${idx}" style="display:none">Undo</a>
+          | <a href="#" class="adjust" data-idx="${idx}">Adjust Pin</a>
+          <br>
+          <div id="note-display-${idx}" style="font-style:italic;color:#555">
+            ${note}
+          </div>`;
+        map.once('moveend', () => m.bindPopup(popup).openPopup());
+        map.setView([lat, lon], 17, { animate:true, duration:0.8 });
       });
+    }
 
-      // Row click opens popup & flyTo
-      tr.addEventListener('click', () => {
-        map.setView([lat, lon], 15);
-        marker.fire('click');
-      });
+    // Load all
+    const snap = await db.collection('pumpStations').get();
+    snap.docs.forEach((doc,i) => addStation(doc,i));
+
+    // Table Save / Delete
+    tbody.addEventListener('click', async e => {
+      const idx = +e.target.dataset.idx;
+      if (e.target.matches('.save')){
+        const tr = tbody.children[idx];
+        const code = tr.querySelector('.code').value;
+        const newAddress = tr.querySelector('.addr').value.trim();
+        const newLat     = parseFloat(tr.querySelector('.lat').value);
+        const newLon     = parseFloat(tr.querySelector('.lon').value);
+        await db.collection('pumpStations').doc(code).update({
+          address:newAddress, lat:newLat, lon:newLon
+        });
+        alert('Saved');
+        location.reload();
+      }
+      if (e.target.matches('.del')){
+        const code = tbody.children[idx].querySelector('.code').value;
+        if (!confirm(`Delete ${code}?`)) return;
+        await db.collection('pumpStations').doc(code).delete();
+        alert('Deleted');
+        location.reload();
+      }
+    });
+
+    // Popup note & adjust-pin handling
+    document.body.addEventListener('click', async e => {
+      const idx = +e.target.dataset.idx;
+      if (isNaN(idx)) return;
+      const code = docs[idx].id;
+
+      // Add/Edit note
+      if (e.target.matches('.note-btn')){
+        e.preventDefault();
+        const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
+        const txt = prompt(`Note for ${code}:`, cur);
+        if (txt!==null){
+          await db.collection('notes').doc(code)
+            .set({ text:txt, updated:firebase.firestore.FieldValue.serverTimestamp() });
+          document.getElementById(`note-display-${idx}`)
+                  .textContent = txt;
+        }
+      }
+      // Delete note
+      if (e.target.matches('.del-note')){
+        e.preventDefault();
+        const snapN = await db.collection('notes').doc(code).get();
+        tempDel[code] = snapN.exists ? snapN.data().text : '';
+        await db.collection('notes').doc(code).delete();
+        document.getElementById(`note-display-${idx}`).textContent = '';
+        e.target.nextElementSibling.style.display = 'inline';
+      }
+      // Undo note
+      if (e.target.matches('.undo-note')){
+        e.preventDefault();
+        await db.collection('notes').doc(code)
+          .set({ text:tempDel[code], updated:firebase.firestore.FieldValue.serverTimestamp() });
+        document.getElementById(`note-display-${idx}`)
+                .textContent = tempDel[code];
+        e.target.style.display='none';
+        delete tempDel[code];
+      }
+      // Adjust pin
+      if (e.target.matches('.adjust')){
+        e.preventDefault();
+        const m = markers[idx];
+        if (!m.dragging.enabled()){
+          m.dragging.enable();
+          e.target.textContent = 'Save Pin';
+        } else {
+          m.dragging.disable();
+          const {lat,lng} = m.getLatLng();
+          await db.collection('pumpStations').doc(code)
+            .update({ lat, lon:lng });
+          alert('Pin moved');
+          location.reload();
+        }
+      }
     });
   })();
   </script>
