@@ -63,7 +63,8 @@
     #shareOverlay {
       position:fixed; top:0; left:0; width:100%; height:100%;
       background:rgba(0,0,0,0.7); display:none;
-      align-items:center; justify-content:center; z-index:2000;
+      align-items:center; justify-content:center;
+      z-index:2000;
     }
     #shareOverlayContent {
       background:#fff; padding:20px; border-radius:8px; text-align:center;
@@ -102,9 +103,9 @@
   <!-- Leaflet & Firebase SDKs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <!-- ← Analytics needs to come right after app-compat -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <!-- Analytics SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
   <script>
     // ─── Firebase init ─────────────────────────────────────────────────
@@ -112,14 +113,14 @@
       apiKey:    "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:"sd3ps-map.firebaseapp.com",
       projectId: "sd3ps-map",
-      measurementId: "G-HHX1X8KFSF"
+      measurementId: "G-HHX1X8KFSF"    // ← your Analytics ID
     });
-    // ─── Initialize Analytics ──────────────────────────────────────────
+    // Initialize Analytics
     firebase.analytics();
 
     const db = firebase.firestore();
 
-    // ─── Grab buttons + inputs ─────────────────────────────────────────
+    // ─── Grab buttons & inputs ─────────────────────────────────────────
     const installBtn    = document.getElementById('installBtn'),
           shareBtn      = document.getElementById('shareBtn'),
           closeShare    = document.getElementById('closeShare'),
@@ -152,7 +153,7 @@
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // ─── All pump stations ───────────────────────────────────────────────
+    // ─── Pump station data ──────────────────────────────────────────────
     const stations = [
       {code:"PS#300 AWXIA",lat:40.7227675,lon:-73.2307527,address:"50 South Saxon Avenue, Bay Shore, NY 11706"},
       {code:"PS#301",lat:40.6930405,lon:-73.2790417,address:"9 Oak Neck Lane, West Islip, NY 11795"},
@@ -173,22 +174,21 @@
       {code:"PS#317-2",lat:40.7868774,lon:-73.406908,address:"270 McGovern Drive, Melville, NY 11747"}
     ];
 
-    // ─── Leaflet map ─────────────────────────────────────────────────────
-    const map    = L.map('map').setView([40.730889, -73.284654], 12),
-          tempDel= {},
-          markers=[];
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    // ─── Leaflet map ────────────────────────────────────────────────────
+    const map = L.map('map').setView([40.730889, -73.284654], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // ─── Build markers & dropdown ────────────────────────────────────────
+    // ─── Keep track of markers & temp storage ────────────────────────────
+    const markers = [], tempDel = {};
+
+    // ─── Build markers & dropdown options ───────────────────────────────
     stations.forEach((st,i) => {
       const popupHTML = `
         <strong>${st.code}</strong><br>
         ${st.address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}"
-           target="_blank">Navigate</a>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank">Navigate</a>
         | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
         | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
         | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
@@ -201,12 +201,13 @@
         map.setView([st.lat, st.lon], 17, { animate:true, duration:0.8 });
       });
       markers.push(m);
+
       const opt = document.createElement('option');
       opt.value = i; opt.text = `${st.code} – ${st.address}`;
       stationSelect.appendChild(opt);
     });
 
-    // ─── Dropdown behavior ────────────────────────────────────────────────
+    // ─── Dropdown pan/zoom + popup ──────────────────────────────────────
     stationSelect.addEventListener('change', () => {
       const i = +stationSelect.value;
       if (i >= 0) {
@@ -215,7 +216,7 @@
       }
     });
 
-    // ─── Refresh note on popup open ─────────────────────────────────────
+    // ─── On any popup open, load note text ──────────────────────────────
     map.on('popupopen', async e => {
       const node = e.popup._contentNode;
       const idx  = node.querySelector('.note-btn').dataset.idx;
@@ -229,7 +230,7 @@
       }
     });
 
-    // ─── Delegate Add/Edit/Delete/Undo ─────────────────────────────────
+    // ─── Delegate Add/Edit / Delete / Undo ─────────────────────────────
     document.body.addEventListener('click', async e => {
       if (e.target.matches('.note-btn')) {
         e.preventDefault();
@@ -240,12 +241,8 @@
         const cur  = snap.exists ? snap.data().text : '';
         const note = prompt(`Note for ${code}:`, cur);
         if (note !== null) {
-          await doc.set({
-            text: note,
-            updated: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          const disp = document.getElementById(`note-display-${i}`);
-          if (disp) disp.textContent = note;
+          await doc.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
+          document.getElementById(`note-display-${i}`).textContent = note;
         }
       }
       if (e.target.matches('.delete-note-btn')) {
@@ -256,23 +253,17 @@
         const snap = await doc.get();
         tempDel[code] = snap.exists ? snap.data().text : '';
         await doc.delete();
-        const disp = document.getElementById(`note-display-${i}`);
-        if (disp) disp.textContent = '';
+        document.getElementById(`note-display-${i}`).textContent = '';
         document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display = 'inline';
       }
       if (e.target.matches('.undo-note-btn')) {
         e.preventDefault();
         const i    = e.target.dataset.idx;
         const code = stations[i].code;
-        const doc  = db.collection('notes').doc(code);
         const prev = tempDel[code];
         if (prev !== undefined) {
-          await doc.set({
-            text: prev,
-            updated: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          const disp = document.getElementById(`note-display-${i}`);
-          if (disp) disp.textContent = prev;
+          await db.collection('notes').doc(code).set({ text: prev, updated: firebase.firestore.FieldValue.serverTimestamp() });
+          document.getElementById(`note-display-${i}`).textContent = prev;
           e.target.style.display = 'none';
           delete tempDel[code];
         }
