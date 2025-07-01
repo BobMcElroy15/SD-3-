@@ -5,9 +5,9 @@
   <title>Admin – Pump Stations</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <!-- PWA manifest & theme -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0066cc">
 
   <!-- Leaflet CSS -->
   <link
@@ -16,50 +16,100 @@
   />
 
   <style>
-    body { font-family: sans-serif; margin:20px; }
-    h1   { margin-bottom:10px; }
+    body { margin:0; padding:0; }
+    #map { height:100vh; }
 
-    /* Admin map */
-    #adminMap { height:400px; margin-bottom:20px; }
+    /* Seal & Buttons & Title & Dropdown & Overlay styling */
+    #seal { position:absolute; top:10px; left:10px; width:70px; z-index:1000; }
+    .leaflet-control-zoom.leaflet-bar {
+      position:absolute!important; top:80px!important; left:10px!important; z-index:1000;
+    }
+    #shareBtn,#installBtn {
+      position:absolute; left:80px; z-index:1000;
+      background:#0066cc;color:#fff;padding:8px 12px;
+      border:none;border-radius:4px;font-size:14px;cursor:pointer;
+    }
+    #shareBtn { top:85px; }
+    #installBtn { top:120px; display:none; }
 
-    /* Table */
-    table { border-collapse: collapse; width:100%; }
-    th, td { border:1px solid #ccc; padding:8px; }
-    th      { background:#f5f5f5; }
-    .selected { background:#ffffcc; }
+    #title {
+      position:absolute; top:10px; left:80px; right:5%;
+      background:#fff; padding:6px; border-radius:6px;
+      font-size:18px; font-weight:bold; text-align:center; z-index:900;
+    }
+    #stationSelect {
+      position:absolute!important; top:50px!important; left:80px!important;
+      width:calc(100% - 90px)!important; max-width:300px;
+      background:#fff; padding:6px; border-radius:6px;
+      font-size:14px; z-index:900;
+    }
+    #shareOverlay {
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      background:rgba(0,0,0,0.7);display:none;
+      align-items:center;justify-content:center;z-index:2000;
+    }
+    #shareOverlayContent {
+      background:#fff;padding:20px;border-radius:8px;text-align:center;
+    }
+    #shareOverlayContent img { max-width:80vw; }
+    #closeShare {
+      margin-top:10px;padding:8px 12px;
+      background:#333;color:#fff;border:none;border-radius:4px;
+      cursor:pointer;
+    }
 
-    input  { width:100%; box-sizing:border-box; }
-    button { margin-right:8px; }
-    #addForm input { width:auto; margin-right:8px; }
+    /* Address search box */
+    #searchContainer {
+      position:absolute; top:160px; left:80px;
+      z-index:1000; display:flex; gap:4px;
+    }
+    #searchContainer input {
+      padding:6px; border:1px solid #ccc; border-radius:4px;
+      width:200px;
+    }
+    #searchContainer button {
+      padding:6px 12px; border:none; border-radius:4px;
+      background:#0066cc; color:#fff; cursor:pointer;
+    }
   </style>
 </head>
 <body>
-  <h1>Pump Stations Admin</h1>
 
-  <!-- interactive admin map -->
-  <div id="adminMap"></div>
+  <!-- Seal + Buttons -->
+  <img id="seal" src="FlatSeal200px.png" alt="County Seal">
+  <button id="shareBtn">Share</button>
+  <button id="installBtn">Install App</button>
 
-  <form id="addForm">
-    <input type="text"    id="newCode"    placeholder="Code (e.g. PS#315)" required>
-    <input type="text"    id="newAddress" placeholder="Address"         required>
-    <input type="number"  id="newLat"     placeholder="Latitude"        step="any" required>
-    <input type="number"  id="newLon"     placeholder="Longitude"       step="any" required>
-    <button type="submit">Add Station</button>
-  </form>
+  <!-- Title + Dropdown -->
+  <div id="title">Pump Stations Admin</div>
+  <select id="stationSelect"><option value="">Select Pump Station</option></select>
 
-  <table id="stationsTable">
-    <thead>
-      <tr>
-        <th>Code</th><th>Address</th><th>Latitude</th><th>Longitude</th><th>Actions</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <!-- Address Search -->
+  <div id="searchContainer">
+    <input id="searchBox" type="text" placeholder="Search address…">
+    <button id="searchBtn">Go</button>
+  </div>
 
-  <!-- Leaflet & Firebase JS -->
+  <!-- Share Overlay -->
+  <div id="shareOverlay">
+    <div id="shareOverlayContent">
+      <p>Scan to share:</p>
+      <img src="qr-code.png" alt="QR code"><br>
+      <button id="closeShare">Close</button>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  <!-- Leaflet & Firebase SDKs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
+
   <script>
-    // ─── Firebase init ───────────────────────────────────────────────
+    // ─── Firebase init (with Analytics) ────────────────────────────────
     firebase.initializeApp({
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -69,136 +119,168 @@
       appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
       measurementId:     "G-HHX1X8KFSF"
     });
-    const db  = firebase.firestore();
-    const col = db.collection('pumpStations');
+    const analytics = firebase.analytics();
+    const db        = firebase.firestore();
 
-    const tableBody = document.querySelector('#stationsTable tbody');
-    const addForm   = document.getElementById('addForm');
+    // ─── DOM refs ───────────────────────────────────────────────────────
+    const installBtn    = document.getElementById('installBtn'),
+          shareBtn      = document.getElementById('shareBtn'),
+          closeShare    = document.getElementById('closeShare'),
+          stationSelect = document.getElementById('stationSelect'),
+          searchBox     = document.getElementById('searchBox'),
+          searchBtn     = document.getElementById('searchBtn');
 
-    // ─── Admin Leaflet map ────────────────────────────────────────────
-    const map     = L.map('adminMap').setView([40.73, -73.28], 12);
+    // ─── PWA install prompt ─────────────────────────────────────────────
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'block';
+    });
+    installBtn.addEventListener('click', async () => {
+      installBtn.style.display = 'none';
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+    });
+
+    // ─── Share overlay toggle ────────────────────────────────────────────
+    shareBtn.addEventListener('click', () => {
+      analytics.logEvent('share_click');
+      document.getElementById('shareOverlay').style.display = 'flex';
+    });
+    closeShare.addEventListener('click', () => {
+      document.getElementById('shareOverlay').style.display = 'none';
+    });
+
+    // ─── ServiceWorker ──────────────────────────────────────────────────
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(console.error);
+    }
+
+    // ─── Map setup ─────────────────────────────────────────────────────
+    const map     = L.map('map').setView([40.730889, -73.284654], 12),
+          markers = [],
+          tempDel = {}; // for undo-delete-note
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // keep track of markers by station code
-    const markers = {};
-
-    // ─── Render a table row, return the <tr>
-    function renderRow(doc) {
-      const code    = doc.id;
-      const data    = doc.data();
-      const tr      = document.createElement('tr');
-      tr.dataset.id = code;
-
-      tr.innerHTML = `
-        <td><input value="${code}" /></td>
-        <td><input value="${data.address}" /></td>
-        <td><input value="${data.lat}"  type="number" step="any" /></td>
-        <td><input value="${data.lon}"  type="number" step="any" /></td>
-        <td>
-          <button class="save">Save</button>
-          <button class="delete">Delete</button>
-        </td>
-      `;
-
-      // Save edits
-      tr.querySelector('.save').onclick = async () => {
-        const [inCode, inAddr, inLat, inLon] = tr.querySelectorAll('input');
-        const newCode = inCode.value.trim(),
-              newAddr = inAddr.value.trim(),
-              newLat  = parseFloat(inLat.value),
-              newLon  = parseFloat(inLon.value);
-        if (!newCode) return alert('Code required');
-
-        if (newCode !== code) {
-          // copy under new key + remove old
-          await col.doc(newCode).set({ address:newAddr, lat:newLat, lon:newLon });
-          await col.doc(code).delete();
-          // reassign marker reference
-          markers[newCode] = markers[code];
-          delete markers[code];
-          tr.dataset.id = newCode;
-        } else {
-          await col.doc(code).update({ address:newAddr, lat:newLat, lon:newLon });
-        }
-        alert('Saved');
-      };
-
-      // Delete station
-      tr.querySelector('.delete').onclick = async () => {
-        if (confirm(`Delete station "${code}"?`)) {
-          await col.doc(code).delete();
-          tr.remove();
-          map.removeLayer(markers[code]);
-        }
-      };
-
-      tableBody.appendChild(tr);
-      return tr;
-    }
-
-    // ─── Load all stations, build map + table ─────────────────────────
-    async function init() {
-      tableBody.innerHTML = '';
-      // remove old markers
-      Object.values(markers).forEach(m=>map.removeLayer(m));
-
-      const snap = await col.get();
-      snap.docs.forEach(doc => {
-        const row = renderRow(doc);
-        const { address, lat, lon } = doc.data();
-
-        // place a draggable marker
-        const marker = L.marker([lat, lon], { draggable:true })
+    // ─── Address Search via Nominatim ──────────────────────────────────
+    searchBtn.addEventListener('click', async () => {
+      const q = searchBox.value.trim();
+      if (!q) return alert('Enter an address to search');
+      try {
+        const res = await fetch(
+          'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' +
+          encodeURIComponent(q)
+        );
+        const [r] = await res.json();
+        if (!r) return alert('No results found');
+        const lat = parseFloat(r.lat), lon = parseFloat(r.lon);
+        map.setView([lat, lon], 17, { animate:true, duration:0.8 });
+        if (window._searchMarker) map.removeLayer(window._searchMarker);
+        window._searchMarker = L.marker([lat, lon], { draggable:true })
           .addTo(map)
-          .bindPopup(`<strong>${doc.id}</strong><br>${address}`);
+          .bindPopup(`<strong>${r.display_name}</strong><br><em>Drag to adjust</em>`)
+          .openPopup();
+      } catch (err) {
+        console.error(err);
+        alert('Search failed');
+      }
+    });
 
-        // clicking marker highlights & scrolls its row
-        marker.on('click', () => {
-          document.querySelectorAll('#stationsTable tr')
-            .forEach(r=>r.classList.remove('selected'));
-          row.classList.add('selected');
-          row.scrollIntoView({ block:'center' });
-        });
-
-        // dragging marker updates Firestore & table inputs
-        marker.on('dragend', async e => {
-          const { lat:newLat, lng:newLon } = e.target.getLatLng();
-          await col.doc(doc.id).update({ lat:newLat, lon:newLon });
-          const inputs = row.querySelectorAll('td input');
-          inputs[2].value = newLat;
-          inputs[3].value = newLon;
-        });
-
-        // clicking the **table row** will fire that marker’s click event
-        row.addEventListener('click', e => {
-          // ignore clicks on the Save/Delete buttons
-          if (e.target.tagName === 'BUTTON') return;
-          marker.fire('click');
-          marker.openPopup();
-        });
-
-        markers[doc.id] = marker;
+    // ─── Load & draw stations (from Firestore) ─────────────────────────
+    async function loadStations() {
+      markers.forEach(m => map.removeLayer(m));
+      markers.length = 0;
+      stationSelect.innerHTML = '<option value="">Select Pump Station</option>';
+      const snap = await db.collection('pumpStations').get();
+      snap.docs.forEach((doc, i) => {
+        const { address, lat, lon } = doc.data(), code = doc.id;
+        // dropdown
+        stationSelect.appendChild(new Option(`${code} – ${address}`, i));
+        // marker
+        const m = L.marker([lat, lon]).addTo(map).bindPopup('');
+        markers.push(m);
+        m.on('click', () => openPopup(i, code, address, lat, lon, m));
       });
     }
 
-    // ─── Add‐station form ─────────────────────────────────────────────
-    addForm.onsubmit = async e => {
-      e.preventDefault();
-      const code    = document.getElementById('newCode').value.trim();
-      const address = document.getElementById('newAddress').value.trim();
-      const lat     = parseFloat(document.getElementById('newLat').value);
-      const lon     = parseFloat(document.getElementById('newLon').value);
-      if (!code) return alert('Code required');
+    // ─── Build & open popup (with live note load) ───────────────────────
+    async function openPopup(i, code, address, lat, lon, marker) {
+      const ns   = await db.collection('notes').doc(code).get();
+      const note = ns.exists ? ns.data().text : '';
+      const html = `
+        <strong>${code}</strong><br>
+        ${address}<br>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+           target="_blank">Navigate</a>
+        | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
+        | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
+        | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
+        <br>
+        <div id="note-display-${i}"
+             style="margin-top:6px;font-style:italic;color:#555;">${note}</div>
+      `;
+      map.once('moveend', () => marker.setPopupContent(html).openPopup());
+      map.setView([lat, lon], 17, { animate:true, duration:0.8 });
+    }
 
-      await col.doc(code).set({ address, lat, lon });
-      init();
-      addForm.reset();
-    };
+    // ─── Dropdown → trigger marker click ────────────────────────────────
+    stationSelect.addEventListener('change', () => {
+      const i = +stationSelect.value;
+      if (i >= 0) {
+        analytics.logEvent('select_station');
+        markers[i].fire('click');
+      }
+    });
 
-    // ─── Kick it off ─────────────────────────────────────────────────
-    init();
+    // ─── Notes CRUD & Undo handlers ────────────────────────────────────
+    document.body.addEventListener('click', async e => {
+      const idx = e.target.dataset.idx;
+      if (idx == null) return;
+      const i    = +idx;
+      const code = stationSelect.options[i+1].text.split(' – ')[0];
+
+      if (e.target.matches('.note-btn')) {
+        e.preventDefault();
+        analytics.logEvent('edit_note',{station:code});
+        const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
+        const txt = prompt(`Note for ${code}:`,cur);
+        if (txt!==null) {
+          await db.collection('notes').doc(code).set({
+            text: txt,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          document.getElementById(`note-display-${i}`).textContent = txt;
+        }
+      }
+      if (e.target.matches('.delete-note-btn')) {
+        e.preventDefault();
+        analytics.logEvent('delete_note',{station:code});
+        const snap = await db.collection('notes').doc(code).get();
+        tempDel[code] = snap.exists ? snap.data().text : '';
+        await db.collection('notes').doc(code).delete();
+        document.getElementById(`note-display-${i}`).textContent = '';
+        document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display = 'inline';
+      }
+      if (e.target.matches('.undo-note-btn')) {
+        e.preventDefault();
+        analytics.logEvent('undo_delete_note',{station:code});
+        await db.collection('notes').doc(code).set({
+          text: tempDel[code],
+          updated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        document.getElementById(`note-display-${i}`).textContent = tempDel[code];
+        e.target.style.display='none';
+        delete tempDel[code];
+      }
+    });
+
+    // ─── Kick things off ────────────────────────────────────────────────
+    loadStations();
   </script>
 </body>
 </html>
