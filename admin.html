@@ -4,172 +4,218 @@
   <meta charset="utf-8">
   <title>Admin – Pump Stations</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0066cc">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
   <style>
-    body { font-family: sans-serif; margin:20px; }
+    body { font-family:sans-serif; margin:20px; }
     h1 { margin-bottom:10px; }
-    table { border-collapse: collapse; width:100%; margin-bottom:20px; }
-    th, td { border:1px solid #ccc; padding:8px; text-align:left; }
+    #map { height:400px; margin:10px 0; }
+    #searchContainer { margin:10px 0; }
+    #searchBox { width:80%; padding:6px; }
+    #searchBtn { padding:6px 10px; }
+    table { border-collapse:collapse; width:100%; margin-top:20px; }
+    th, td { border:1px solid #ccc; padding:8px; }
     th { background:#f5f5f5; }
-    input { width: 100%; box-sizing: border-box; }
-    button { margin-right:8px; }
-    #addForm input { width:auto; margin-right:8px; }
-    #map { height: 400px; width: 100%; margin-bottom: 20px; }
+    input { box-sizing:border-box; }
+    button { margin-right:6px; }
+    #addForm input { margin-right:8px; }
   </style>
 </head>
 <body>
   <h1>Pump Stations Admin</h1>
 
+  <!-- Add Station form -->
   <form id="addForm">
-    <input type="text" id="newCode" placeholder="Code (e.g. PS#315)" required>
+    <input type="text" id="newCode"    placeholder="Code (e.g. PS#315)" required>
     <input type="text" id="newAddress" placeholder="Address" required>
-    <input type="number" id="newLat" placeholder="Latitude" step="any" required>
-    <input type="number" id="newLon" placeholder="Longitude" step="any" required>
+    <input type="number" id="newLat"   placeholder="Latitude" step="any" required>
+    <input type="number" id="newLon"   placeholder="Longitude" step="any" required>
     <button type="submit">Add Station</button>
   </form>
 
-  <h2>Edit Stations on Map</h2>
+  <!-- Manual address search -->
+  <div id="searchContainer">
+    <input type="text" id="searchBox" placeholder="Search address…">
+    <button id="searchBtn">Search</button>
+  </div>
+
+  <!-- Map -->
   <div id="map"></div>
 
+  <!-- Table of stations -->
   <table id="stationsTable">
     <thead>
-      <tr>
-        <th>Code</th>
-        <th>Address</th>
-        <th>Latitude</th>
-        <th>Longitude</th>
-        <th>Actions</th>
-      </tr>
+      <tr><th>Code</th><th>Address</th><th>Lat</th><th>Lon</th><th>Actions</th></tr>
     </thead>
-    <tbody>
-      <!-- rows injected here -->
-    </tbody>
+    <tbody></tbody>
   </table>
 
+  <!-- Leaflet & Firebase SDKs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <script>
-    // ─── Firebase init ─────────────────────────────────────────────────
-    firebase.initializeApp({
-      apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
-      authDomain:        "sd3ps-map.firebaseapp.com",
-      projectId:         "sd3ps-map",
-      storageBucket:     "sd3ps-map.appspot.com",
-      messagingSenderId: "14976888367",
-      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
-      measurementId:     "G-HHX1X8KFSF"
-    });
-    const db = firebase.firestore();
-    const col = db.collection('pumpStations');
+  // ─── Firebase init ─────────────────────────────────────────────────
+  firebase.initializeApp({
+    apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
+    authDomain:        "sd3ps-map.firebaseapp.com",
+    projectId:         "sd3ps-map",
+    storageBucket:     "sd3ps-map.appspot.com",
+    messagingSenderId: "14976888367",
+    appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
+    measurementId:     "G-HHX1X8KFSF"
+  });
+  const db  = firebase.firestore();
+  const col = db.collection('pumpStations');
 
-    const tableBody = document.querySelector('#stationsTable tbody');
-    const addForm = document.getElementById('addForm');
-    const mapDiv = document.getElementById('map');
-    const markers = [];
+  // ─── Build the Leaflet map ──────────────────────────────────────────
+  const map    = L.map('map').setView([40.730889, -73.284654], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap contributors'
+  }).addTo(map);
 
-    // ─── Leaflet map setup ─────────────────────────────────────────────
-    const map = L.map(mapDiv).setView([40.730889, -73.284654], 12);
+  let markers = [];
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      attribution:'© OpenStreetMap contributors'
-    }).addTo(map);
+  // ─── Open a marker’s popup (immediately) ───────────────────────────
+  async function openPopup(i, code, address, lat, lon, marker) {
+    const snap = await db.collection('notes').doc(code).get();
+    const note = snap.exists ? snap.data().text : '';
+    const html = `
+      <strong>${code}</strong><br>
+      ${address}<br>
+      <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+         target="_blank">Navigate</a>
+      | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
+      | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
+      | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
+      <br>
+      <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;">
+        ${note}
+      </div>
+    `;
+    marker.setPopupContent(html).openPopup();
+    map.setView([lat, lon], 17, { animate:true, duration:0.6 });
+  }
 
-    // ─── Load stations from Firestore and display markers on map ───────
-    async function loadStations() {
-      // Clear existing markers
-      markers.forEach(m => map.removeLayer(m));
-      markers.length = 0;
-      tableBody.innerHTML = '';  // Clear table
+  // ─── Load all stations & render table + markers ────────────────────
+  async function loadStations() {
+    // clear existing
+    markers.forEach(m => m.remove());
+    markers = [];
+    document.querySelector('#stationsTable tbody').innerHTML = '';
 
-      const snap = await col.get();
-      snap.docs.forEach((doc, i) => {
-        const { address, lat, lon } = doc.data();
-        const code = doc.id;
+    const snap = await col.get();
+    snap.docs.forEach((doc, i) => {
+      const { address, lat, lon } = doc.data();
+      const code = doc.id;
 
-        // Add station to the table
-        const tr = document.createElement('tr');
-        tr.dataset.id = doc.id;
-        tr.innerHTML = `
-          <td><input value="${code}" /></td>
-          <td><input value="${address}" /></td>
-          <td><input value="${lat}" type="number" step="any" /></td>
-          <td><input value="${lon}" type="number" step="any" /></td>
-          <td>
-            <button class="save">Save</button>
-            <button class="delete">Delete</button>
-            <button class="move-pin">Move Pin</button>
-          </td>
-        `;
-        tableBody.appendChild(tr);
+      // 1) row in table
+      const tr = document.createElement('tr');
+      tr.dataset.code = code;
+      tr.innerHTML = `
+        <td><input value="${code}" /></td>
+        <td><input value="${address}" /></td>
+        <td><input value="${lat}"   type="number" step="any" /></td>
+        <td><input value="${lon}"   type="number" step="any" /></td>
+        <td>
+          <button class="save">Save</button>
+          <button class="delete">Delete</button>
+          <button class="move-pin">Move Pin</button>
+        </td>
+      `;
+      document.querySelector('#stationsTable tbody').appendChild(tr);
 
-        // Create marker on map for the station
-        const m = L.marker([lat, lon]).addTo(map);
-        markers.push(m);
-
-        // Add event listener for pin move
-        tr.querySelector('.move-pin').onclick = () => {
-          const newLat = parseFloat(tr.querySelector('input:nth-child(3)').value);
-          const newLon = parseFloat(tr.querySelector('input:nth-child(4)').value);
-          m.setLatLng([newLat, newLon]);
-          map.setView([newLat, newLon], 17);
-        };
-
-        // Add event listener for Save
-        tr.querySelector('.save').onclick = async () => {
-          const updatedCode = tr.querySelector('input:nth-child(1)').value.trim();
-          const updatedAddress = tr.querySelector('input:nth-child(2)').value.trim();
-          const updatedLat = parseFloat(tr.querySelector('input:nth-child(3)').value);
-          const updatedLon = parseFloat(tr.querySelector('input:nth-child(4)').value);
-
-          if (updatedCode !== doc.id) {
-            const data = { code: updatedCode, address: updatedAddress, lat: updatedLat, lon: updatedLon };
-            await col.doc(updatedCode).set(data);
-            await col.doc(doc.id).delete();
-            tr.dataset.id = updatedCode;
-          } else {
-            await col.doc(doc.id).update({
-              address: updatedAddress,
-              lat: updatedLat,
-              lon: updatedLon
-            });
-          }
-          m.setLatLng([updatedLat, updatedLon]);  // Move marker
-          alert('Saved');
-        };
-
-        // Add event listener for Delete
-        tr.querySelector('.delete').onclick = async () => {
-          if (confirm(`Delete station "${doc.id}"?`)) {
-            await col.doc(doc.id).delete();
-            m.remove();
-            tr.remove();
-          }
-        };
+      // ignore clicks on buttons/inputs → row‐click opens popup
+      tr.addEventListener('click', e => {
+        if (e.target.tagName==='BUTTON' || e.target.tagName==='INPUT') return;
+        markers[i].fire('click');
       });
-    }
 
-    // ─── Add new station form ─────────────────────────────────────────
-    addForm.onsubmit = async e => {
-      e.preventDefault();
-      const code = document.getElementById('newCode').value.trim();
-      const address = document.getElementById('newAddress').value.trim();
-      const lat = parseFloat(document.getElementById('newLat').value);
-      const lon = parseFloat(document.getElementById('newLon').value);
+      // Save station edits
+      tr.querySelector('.save').onclick = async e => {
+        e.stopPropagation();
+        const inputs     = tr.querySelectorAll('input');
+        const newCode    = inputs[0].value.trim();
+        const newAddress = inputs[1].value.trim();
+        const newLat     = parseFloat(inputs[2].value);
+        const newLon     = parseFloat(inputs[3].value);
+        if (newCode !== code) {
+          await col.doc(newCode).set({ code:newCode, address:newAddress, lat:newLat, lon:newLon });
+          await col.doc(code).delete();
+          tr.dataset.code = newCode;
+        } else {
+          await col.doc(code).update({ address:newAddress, lat:newLat, lon:newLon });
+        }
+        markers[i].setLatLng([newLat, newLon]);
+        alert('Saved');
+      };
 
-      if (!code) return alert('Code required');
-      await col.doc(code).set({ code, address, lat, lon });
-      
-      // Re-render the list of stations
-      loadStations();
-      addForm.reset();
-    };
+      // Delete station
+      tr.querySelector('.delete').onclick = async e => {
+        e.stopPropagation();
+        if (!confirm(`Delete "${code}"?`)) return;
+        await col.doc(code).delete();
+        markers[i].remove();
+        tr.remove();
+      };
 
-    // Load stations on page load
+      // Move Pin to new coordinates
+      tr.querySelector('.move-pin').onclick = e => {
+        e.stopPropagation();
+        const newLat = parseFloat(tr.children[2].firstElementChild.value);
+        const newLon = parseFloat(tr.children[3].firstElementChild.value);
+        markers[i].setLatLng([newLat,newLon]);
+        map.setView([newLat,newLon],17);
+      };
+
+      // 2) marker on map
+      const marker = L.marker([lat, lon]).addTo(map);
+      markers.push(marker);
+      marker.on('click', () => openPopup(i, code, address, lat, lon, marker));
+    });
+  }
+
+  // ─── Address search (Nominatim) ───────────────────────────────────
+  document.getElementById('searchBtn').onclick = async () => {
+    const q = document.getElementById('searchBox').value.trim();
+    if (!q) return alert('Enter an address to search');
+    const res = await fetch(
+      'https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+
+      encodeURIComponent(q)
+    );
+    const j = await res.json();
+    if (!j.length) return alert('No matches');
+    const { lat, lon, display_name } = j[0];
+    const la = parseFloat(lat), lo = parseFloat(lon);
+    map.setView([la, lo], 17);
+    // auto-fill Add form
+    document.getElementById('newAddress').value = display_name;
+    document.getElementById('newLat').value     = la.toFixed(6);
+    document.getElementById('newLon').value     = lo.toFixed(6);
+  };
+
+  // ─── Add new station ───────────────────────────────────────────────
+  document.getElementById('addForm').onsubmit = async e => {
+    e.preventDefault();
+    const code    = document.getElementById('newCode').value.trim();
+    const address = document.getElementById('newAddress').value.trim();
+    const lat     = parseFloat(document.getElementById('newLat').value);
+    const lon     = parseFloat(document.getElementById('newLon').value);
+    if (!code) return alert('Code required');
+    await col.doc(code).set({ code,address,lat,lon });
     loadStations();
+    e.target.reset();
+  };
+
+  // ─── Initial load ─────────────────────────────────────────────────
+  loadStations();
   </script>
 </body>
 </html>
+
