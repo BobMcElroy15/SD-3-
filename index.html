@@ -4,81 +4,30 @@
   <meta charset="utf-8">
   <title>Sewer District 3 Pump Station Map</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-
-  <!-- PWA manifest & theme -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0066cc">
-
-  <!-- Leaflet CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
-
   <style>
     body { margin:0; padding:0; }
-    #map  { height:100vh; }
-
-    /* Seal */
-    #seal {
-      position:absolute; top:10px; left:10px;
-      width:70px; z-index:1000;
-    }
-
-    /* Leaflet zoom controls */
-    .leaflet-control-zoom.leaflet-bar {
-      position:absolute!important;
-      top:80px!important; left:10px!important;
-      z-index:1000;
-    }
-
-    /* Share & Install buttons */
-    #shareBtn, #installBtn {
-      position:absolute; left:80px; z-index:1000;
-      background:#0066cc; color:#fff;
-      padding:8px 12px; border:none; border-radius:4px;
-      font-size:14px; cursor:pointer;
-    }
-    #shareBtn   { top:85px; }
-    #installBtn { top:120px; display:none; }
-
-    /* Title bar */
-    #title {
-      position:absolute; top:10px; left:80px; right:5%;
-      background:#fff; padding:6px; border-radius:6px;
-      font-size:18px; font-weight:bold; text-align:center;
-      z-index:900;
-    }
-
-    /* Dropdown */
-    #stationSelect {
-      position:absolute!important;
-      top:50px!important; left:80px!important;
-      width:calc(100% - 90px)!important; max-width:300px;
-      background:#fff; padding:6px; border-radius:6px;
-      font-size:14px; z-index:900;
-    }
-
-    /* Share Overlay */
-    #shareOverlay {
-      position:fixed; top:0; left:0; width:100%; height:100%;
-      background:rgba(0,0,0,0.7); display:none;
-      align-items:center; justify-content:center;
-      z-index:2000;
-    }
-    #shareOverlayContent {
-      background:#fff; padding:20px; border-radius:8px;
-      text-align:center;
-    }
+    #map { height:100vh; }
+    /* seal, zoom controls, buttons, title, dropdown, overlay styling */
+    #seal { position:absolute; top:10px; left:10px; width:70px; z-index:1000; }
+    .leaflet-control-zoom.leaflet-bar { position:absolute!important; top:80px!important; left:10px!important; z-index:1000; }
+    #shareBtn,#installBtn { position:absolute; left:80px; z-index:1000; background:#0066cc;color:#fff;padding:8px 12px;border:none;border-radius:4px;font-size:14px;cursor:pointer; }
+    #shareBtn { top:85px; } #installBtn { top:120px; display:none; }
+    #title { position:absolute; top:10px; left:80px; right:5%; background:#fff; padding:6px; border-radius:6px; font-size:18px; font-weight:bold; text-align:center; z-index:900; }
+    #stationSelect { position:absolute!important; top:50px!important; left:80px!important; width:calc(100% - 90px)!important; max-width:300px; background:#fff; padding:6px; border-radius:6px; font-size:14px; z-index:900; }
+    #shareOverlay { position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:2000; }
+    #shareOverlayContent { background:#fff;padding:20px;border-radius:8px;text-align:center; }
     #shareOverlayContent img { max-width:80vw; }
-    #closeShare {
-      margin-top:10px; padding:8px 12px;
-      background:#333; color:#fff; border:none; border-radius:4px;
-      cursor:pointer;
-    }
+    #closeShare { margin-top:10px;padding:8px 12px;background:#333;color:#fff;border:none;border-radius:4px;cursor:pointer; }
   </style>
 </head>
 <body>
+
   <!-- Seal + Buttons -->
   <img id="seal" src="FlatSeal200px.png" alt="County Seal">
   <button id="shareBtn">Share</button>
@@ -86,9 +35,7 @@
 
   <!-- Title + Dropdown -->
   <div id="title">Sewer District 3 Pump Station Map</div>
-  <select id="stationSelect">
-    <option value="">Select Pump Station</option>
-  </select>
+  <select id="stationSelect"><option value="">Select Pump Station</option></select>
 
   <!-- Share Overlay -->
   <div id="shareOverlay">
@@ -109,7 +56,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
   <script>
-    // ─── Firebase init (with Analytics) ────────────────────────────────
+    // ─── Firebase init ─────────────────────────────────────────────────
     firebase.initializeApp({
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -122,7 +69,7 @@
     const analytics = firebase.analytics();
     const db        = firebase.firestore();
 
-    // ─── DOM references ────────────────────────────────────────────────
+    // ─── DOM refs ───────────────────────────────────────────────────────
     const installBtn    = document.getElementById('installBtn'),
           shareBtn      = document.getElementById('shareBtn'),
           closeShare    = document.getElementById('closeShare'),
@@ -151,126 +98,122 @@
       document.getElementById('shareOverlay').style.display = 'none';
     });
 
-    // ─── Service worker (install only) ─────────────────────────────────
+    // ─── ServiceWorker ──────────────────────────────────────────────────
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
-    // ─── Leaflet map setup ─────────────────────────────────────────────
+    // ─── Map setup ─────────────────────────────────────────────────────
     const map     = L.map('map').setView([40.730889, -73.284654], 12),
           markers = [],
-          tempDel = {};
+          tempDel = {}; // for undo‐delete-note
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
     }).addTo(map);
 
-    // ─── Fetch stations from Firestore & build UI ─────────────────────
-    async function initStations() {
-      // clear any old markers & dropdown
+    // ─── Load & build from pumpStations collection ─────────────────────
+    async function loadStations() {
+      // clear old
       markers.forEach(m => map.removeLayer(m));
       markers.length = 0;
       stationSelect.innerHTML = '<option value="">Select Pump Station</option>';
 
-      // load from Firestore
+      // fetch all
       const snap = await db.collection('pumpStations').get();
-      const stations = snap.docs.map(doc => ({
-        code: doc.id,
-        address: doc.data().address,
-        lat: doc.data().lat,
-        lon: doc.data().lon
-      }));
+      snap.docs.forEach((doc, i) => {
+        const { address, lat, lon } = doc.data();
+        const code = doc.id;
 
-      stations.forEach((st, i) => {
-        // add to dropdown
-        const opt = new Option(`${st.code} – ${st.address}`, i);
+        // dropdown
+        const opt = new Option(`${code} – ${address}`, i);
         stationSelect.appendChild(opt);
 
-        // create marker w/ empty popup
-        const m = L.marker([st.lat, st.lon]).addTo(map).bindPopup('');
+        // marker
+        const m = L.marker([lat, lon]).addTo(map).bindPopup('');
         markers.push(m);
-
-        // on‐marker click: fetch latest note, rebuild popup, pan & open
-        m.on('click', async () => {
-          const noteSnap = await db.collection('notes').doc(st.code).get();
-          const note = noteSnap.exists ? noteSnap.data().text : '';
-
-          const html = `
-            <strong>${st.code}</strong><br>
-            ${st.address}<br>
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}"
-               target="_blank">Navigate</a>
-            | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
-            | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
-            | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
-            <br>
-            <div id="note-display-${i}" style="margin-top:6px;font-style:italic;color:#555;">
-              ${note}
-            </div>
-          `;
-
-          map.once('moveend', () => m.setPopupContent(html).openPopup());
-          map.setView([st.lat, st.lon], 17, { animate:true, duration:0.8 });
-        });
+        m.on('click', () => openPopup(i, code, address, lat, lon, m));
       });
     }
 
-    // wire up dropdown to “click” corresponding marker
+    // ─── Popup builder & note‐fetcher ───────────────────────────────────
+    async function openPopup(i, code, address, lat, lon, marker) {
+      const ns = await db.collection('notes').doc(code).get();
+      const note = ns.exists ? ns.data().text : '';
+      const html = `
+        <strong>${code}</strong><br>
+        ${address}<br>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+           target="_blank">Navigate</a>
+        | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
+        | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
+        | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo Delete</a>
+        <br>
+        <div id="note-display-${i}"
+             style="margin-top:6px;font-style:italic;color:#555;">${note}</div>
+      `;
+      map.once('moveend', () => marker.setPopupContent(html).openPopup());
+      map.setView([lat, lon], 17, { animate:true, duration:0.8 });
+    }
+
+    // ─── Dropdown → trigger marker click ────────────────────────────────
     stationSelect.addEventListener('change', () => {
       const i = +stationSelect.value;
       if (i >= 0) {
-        analytics.logEvent('select_station', { station: markers[i] && markers[i].options.title });
-        map.once('moveend', () => markers[i].fire('click'));
-        map.setView(markers[i].getLatLng(), 17, { animate:true, duration:0.8 });
+        analytics.logEvent('select_station');
+        markers[i].fire('click');
       }
     });
 
-    // handle Add/Edit/Delete/Undo clicks inside any popup
+    // ─── Notes CRUD & Undo ─────────────────────────────────────────────
     document.body.addEventListener('click', async e => {
+      if (!e.target.dataset.idx) return;
+      const i    = +e.target.dataset.idx;
+      const opt  = stationSelect.options[i+1].text; // +1 b/c first is placeholder
+      const code = opt.split(' – ')[0];
+
+      // Add/Edit Note
       if (e.target.matches('.note-btn')) {
         e.preventDefault();
-        const i    = +e.target.dataset.idx;
-        const code = stationSelect.options[i+1].text.split(' – ')[0];
         analytics.logEvent('edit_note', { station: code });
-        const docRef = db.collection('notes').doc(code);
-        const cur    = (await docRef.get()).data()?.text || '';
-        const note   = prompt(`Note for ${code}:`, cur);
-        if (note !== null) {
-          await docRef.set({ text: note, updated: firebase.firestore.FieldValue.serverTimestamp() });
-          document.getElementById(`note-display-${i}`).textContent = note;
+        const cur = (await db.collection('notes').doc(code).get()).data()?.text || '';
+        const txt = prompt(`Note for ${code}:`, cur);
+        if (txt !== null) {
+          await db.collection('notes').doc(code).set({
+            text: txt,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          document.getElementById(`note-display-${i}`).textContent = txt;
         }
       }
 
+      // Delete Note
       if (e.target.matches('.delete-note-btn')) {
         e.preventDefault();
-        const i    = +e.target.dataset.idx;
-        const code = stationSelect.options[i+1].text.split(' – ')[0];
         analytics.logEvent('delete_note', { station: code });
-        const docRef = db.collection('notes').doc(code);
-        const prev   = (await docRef.get()).data()?.text || '';
-        tempDel[code] = prev;
-        await docRef.delete();
+        const doc = await db.collection('notes').doc(code).get();
+        tempDel[code] = doc.exists ? doc.data().text : '';
+        await db.collection('notes').doc(code).delete();
         document.getElementById(`note-display-${i}`).textContent = '';
-        document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display='inline';
+        document.querySelector(`.undo-note-btn[data-idx="${i}"]`).style.display = 'inline';
       }
 
+      // Undo Delete
       if (e.target.matches('.undo-note-btn')) {
         e.preventDefault();
-        const i    = +e.target.dataset.idx;
-        const code = stationSelect.options[i+1].text.split(' – ')[0];
         analytics.logEvent('undo_delete_note', { station: code });
         await db.collection('notes').doc(code).set({
           text: tempDel[code],
           updated: firebase.firestore.FieldValue.serverTimestamp()
         });
         document.getElementById(`note-display-${i}`).textContent = tempDel[code];
-        e.target.style.display='none';
+        e.target.style.display = 'none';
         delete tempDel[code];
       }
     });
 
-    // ─── Kick it all off ───────────────────────────────────────────────
-    initStations();
+    // ─── Initialize everything ─────────────────────────────────────────
+    loadStations();
   </script>
 </body>
 </html>
