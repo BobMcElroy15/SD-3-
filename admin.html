@@ -61,12 +61,12 @@
   (function(){
     // ─── Firebase init ────────────────────────────────────────────────
     firebase.initializeApp({
-      apiKey:            "AIzaSy…", 
+      apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
       projectId:         "sd3ps-map",
       storageBucket:     "sd3ps-map.appspot.com",
       messagingSenderId: "14976888367",
-      appId:             "1:14976888367:web:…",
+      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
       measurementId:     "G-HHX1X8KFSF"
     });
     firebase.analytics();
@@ -141,17 +141,18 @@
           <td><input class="lat"   type="number" step="any" value="${lat}" disabled></td>
           <td><input class="lon"   type="number" step="any" value="${lon}" disabled></td>
           <td>
-            <button class="edit" data-i="${i}">Edit</button>
-            <button class="save" data-i="${i}" style="display:none">Save</button>
-            <button class="cancel" data-i="${i}"style="display:none">Cancel</button>
-            <button class="del" data-i="${i}">Delete</button>
+            <button class="edit"   data-i="${i}">Edit</button>
+            <button class="save"   data-i="${i}" style="display:none">Save</button>
+            <button class="cancel" data-i="${i}" style="display:none">Cancel</button>
+            <button class="del"    data-i="${i}">Delete</button>
           </td>`;
         tbody.appendChild(tr);
         tr.addEventListener('click',()=> markers[i].fire('click'));
+
         // marker + popup
         const m = L.marker([lat,lon]).addTo(map);
         markers[i]=m;
-        m.on('click',()=> openPopup(i, code,tr,m));
+        m.on('click',()=> openPopup(i, code, tr, m));
       }
 
       // load all
@@ -160,36 +161,48 @@
 
       // popup builder
       async function openPopup(i,code,tr,m){
-        document.querySelectorAll('tr').forEach(r=>r.classList.remove('selected'));
+        // highlight
+        document.querySelectorAll('#stationsBody tr').forEach(r=>r.classList.remove('selected'));
         tr.classList.add('selected');
-        const snap = await db.collection('notes').doc(code).get();
-        const note = snap.exists? snap.data().text :'';
+
+        const snapN = await db.collection('notes').doc(code).get();
+        const note  = snapN.exists? snapN.data().text : '';
+        const addr  = tr.querySelector('.addr').value;
+        const lati  = tr.querySelector('.lat').value;
+        const longi = tr.querySelector('.lon').value;
         const html = `
-          <strong>${code}</strong><br>${tr.querySelector('.addr').value}<br>
-          <a href="https://maps.google.com/?q=${tr.querySelector('.lat').value},${tr.querySelector('.lon').value}" target="_blank">Navigate</a>
+          <strong>${code}</strong><br>${addr}<br>
+          <a href="https://maps.google.com/?q=${lati},${longi}" target="_blank">Navigate</a>
           | <a href="#" class="note-btn" data-i="${i}">Add/Edit Note</a>
           | <a href="#" class="adjust"  data-i="${i}">Adjust Pin</a>
           <br><div id="note-display-${i}" style="font-style:italic;">${note}</div>`;
         map.once('moveend',()=> m.bindPopup(html).openPopup());
-        map.setView(m.getLatLng(),17,{animate:true,duration:0.5});
+        map.setView([lati,longi],17,{animate:true,duration:0.5});
       }
 
       // table action delegation
       tbody.addEventListener('click',async e=>{
-        const i = +e.target.dataset.i, tr=tbody.children[i], code=tr.querySelector('.code').value;
+        const i = +e.target.dataset.i, tr=tbody.children[i];
+        const code = tr.querySelector('.code').value;
         if(e.target.matches('.edit')){
-          tr.querySelectorAll('input').forEach(inp=>inp.disabled=false,inp.classList.add('editing'));
+          tr.querySelectorAll('input').forEach(inp=>{
+            inp.disabled=false;
+            inp.classList.add('editing');
+          });
           tr.querySelector('.edit').style.display='none';
-          tr.querySelector('.save, .cancel').forEach(b=>b.style.display='inline');
+          tr.querySelectorAll('.save, .cancel').forEach(b=>b.style.display='inline');
         }
         if(e.target.matches('.cancel')){
-          const doc=docs[i].data();
-          tr.querySelector('.addr').value=doc.address;
-          tr.querySelector('.lat' ).value=doc.lat;
-          tr.querySelector('.lon' ).value=doc.lon;
-          tr.querySelectorAll('input').forEach(inp=>inp.disabled=true,inp.classList.remove('editing'));
+          const d = docs[i].data();
+          tr.querySelector('.addr').value=d.address;
+          tr.querySelector('.lat' ).value=d.lat;
+          tr.querySelector('.lon' ).value=d.lon;
+          tr.querySelectorAll('input').forEach(inp=>{
+            inp.disabled=true;
+            inp.classList.remove('editing');
+          });
           tr.querySelector('.edit').style.display='inline';
-          tr.querySelector('.save, .cancel').forEach(b=>b.style.display='none');
+          tr.querySelectorAll('.save, .cancel').forEach(b=>b.style.display='none');
         }
         if(e.target.matches('.save')){
           const newA=tr.querySelector('.addr').value,
@@ -199,9 +212,12 @@
             .update({address:newA,lat:newY,lon:newX});
           markers[i].setLatLng([newY,newX]);
           alert('Saved');
-          tr.querySelectorAll('input').forEach(inp=>inp.disabled=true,inp.classList.remove('editing'));
+          tr.querySelectorAll('input').forEach(inp=>{
+            inp.disabled=true;
+            inp.classList.remove('editing');
+          });
           tr.querySelector('.edit').style.display='inline';
-          tr.querySelector('.save, .cancel').forEach(b=>b.style.display='none');
+          tr.querySelectorAll('.save, .cancel').forEach(b=>b.style.display='none');
         }
         if(e.target.matches('.del')){
           if(!confirm(`Delete ${code}?`)) return;
@@ -212,7 +228,8 @@
 
       // popup note & adjust-pin
       document.body.addEventListener('click',async e=>{
-        const i=+e.target.dataset.i; if(isNaN(i)) return;
+        const i = +e.target.dataset.i;
+        if(isNaN(i)) return;
         const code=docs[i].id, m=markers[i];
         if(e.target.matches('.note-btn')){
           e.preventDefault();
@@ -227,7 +244,8 @@
         if(e.target.matches('.adjust')){
           e.preventDefault();
           if(!m.dragging.enabled()){
-            m.dragging.enable(); e.target.textContent='Save Pin';
+            m.dragging.enable();
+            e.target.textContent='Save Pin';
           } else {
             m.dragging.disable();
             const {lat,lng}=m.getLatLng();
