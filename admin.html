@@ -16,28 +16,34 @@
   />
 
   <style>
-    body { font-family:sans-serif; margin:20px; }
+    body { font-family: sans-serif; margin:20px; }
+    h1   { margin-bottom:10px; }
+
+    /* Admin map */
     #adminMap { height:400px; margin-bottom:20px; }
-    table { border-collapse:collapse; width:100%; margin-top:20px; }
-    th,td { border:1px solid #ccc; padding:8px; }
-    th { background:#f5f5f5; }
-    .selected { background: #ffffcc; }
-    input { width:100%; box-sizing:border-box; }
-    #addForm input { width:auto; margin-right:8px; }
+
+    /* Table */
+    table { border-collapse: collapse; width:100%; }
+    th, td { border:1px solid #ccc; padding:8px; }
+    th      { background:#f5f5f5; }
+    .selected { background:#ffffcc; }
+
+    input  { width:100%; box-sizing:border-box; }
     button { margin-right:8px; }
+    #addForm input { width:auto; margin-right:8px; }
   </style>
 </head>
 <body>
   <h1>Pump Stations Admin</h1>
 
-  <!-- interactive map -->
+  <!-- interactive admin map -->
   <div id="adminMap"></div>
 
   <form id="addForm">
-    <input type="text" id="newCode" placeholder="Code (e.g. PS#315)" required>
-    <input type="text" id="newAddress" placeholder="Address" required>
-    <input type="number" id="newLat" placeholder="Latitude" step="any" required>
-    <input type="number" id="newLon" placeholder="Longitude" step="any" required>
+    <input type="text"    id="newCode"    placeholder="Code (e.g. PS#315)" required>
+    <input type="text"    id="newAddress" placeholder="Address"         required>
+    <input type="number"  id="newLat"     placeholder="Latitude"        step="any" required>
+    <input type="number"  id="newLon"     placeholder="Longitude"       step="any" required>
     <button type="submit">Add Station</button>
   </form>
 
@@ -53,7 +59,7 @@
   <!-- Leaflet & Firebase JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // ─── Firebase init ────────────────────────────────────────
+    // ─── Firebase init ───────────────────────────────────────────────
     firebase.initializeApp({
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -69,14 +75,16 @@
     const tableBody = document.querySelector('#stationsTable tbody');
     const addForm   = document.getElementById('addForm');
 
-    // ─── Leaflet admin map ───────────────────────────────────
-    const map = L.map('adminMap').setView([40.73, -73.28], 12);
+    // ─── Admin Leaflet map ────────────────────────────────────────────
+    const map     = L.map('adminMap').setView([40.73, -73.28], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      attribution:'© OpenStreetMap'
+      attribution:'© OpenStreetMap contributors'
     }).addTo(map);
-    const markers = {};  // code → marker
 
-    // ─── build a table row & wire up its buttons ────────────
+    // keep track of markers by station code
+    const markers = {};
+
+    // ─── Render a table row, return the <tr>
     function renderRow(doc) {
       const code    = doc.id;
       const data    = doc.data();
@@ -94,32 +102,32 @@
         </td>
       `;
 
-      // Save handler
+      // Save edits
       tr.querySelector('.save').onclick = async () => {
-        const [codeIn, addrIn, latIn, lonIn] = tr.querySelectorAll('input');
-        const newCode    = codeIn.value.trim();
-        const newAddr    = addrIn.value.trim();
-        const newLat     = parseFloat(latIn.value);
-        const newLon     = parseFloat(lonIn.value);
-
+        const [inCode, inAddr, inLat, inLon] = tr.querySelectorAll('input');
+        const newCode = inCode.value.trim(),
+              newAddr = inAddr.value.trim(),
+              newLat  = parseFloat(inLat.value),
+              newLon  = parseFloat(inLon.value);
         if (!newCode) return alert('Code required');
-        // If code changed, copy & delete old
+
         if (newCode !== code) {
+          // copy under new key + remove old
           await col.doc(newCode).set({ address:newAddr, lat:newLat, lon:newLon });
           await col.doc(code).delete();
-          tr.dataset.id = newCode;
-          // also rekey marker
+          // reassign marker reference
           markers[newCode] = markers[code];
           delete markers[code];
+          tr.dataset.id = newCode;
         } else {
           await col.doc(code).update({ address:newAddr, lat:newLat, lon:newLon });
         }
         alert('Saved');
       };
 
-      // Delete handler
+      // Delete station
       tr.querySelector('.delete').onclick = async () => {
-        if (confirm(`Delete station "${code}"?`)){
+        if (confirm(`Delete station "${code}"?`)) {
           await col.doc(code).delete();
           tr.remove();
           map.removeLayer(markers[code]);
@@ -130,39 +138,52 @@
       return tr;
     }
 
-    // ─── load + render everything ─────────────────────────────
+    // ─── Load all stations, build map + table ─────────────────────────
     async function init() {
-      const snapshot = await col.get();
-      // clear existing
       tableBody.innerHTML = '';
-      // add rows & markers
-      snapshot.forEach(doc => {
-        const row = renderRow(doc);
+      // remove old markers
+      Object.values(markers).forEach(m=>map.removeLayer(m));
 
-        const { lat, lon, address } = doc.data();
+      const snap = await col.get();
+      snap.docs.forEach(doc => {
+        const row = renderRow(doc);
+        const { address, lat, lon } = doc.data();
+
+        // place a draggable marker
         const marker = L.marker([lat, lon], { draggable:true })
           .addTo(map)
           .bindPopup(`<strong>${doc.id}</strong><br>${address}`);
 
-        // click → select its row
+        // clicking marker highlights & scrolls its row
         marker.on('click', () => {
-          document.querySelectorAll('#stationsTable tr').forEach(r=>r.classList.remove('selected'));
+          document.querySelectorAll('#stationsTable tr')
+            .forEach(r=>r.classList.remove('selected'));
           row.classList.add('selected');
           row.scrollIntoView({ block:'center' });
         });
-        // drag → update Firestore & table inputs
+
+        // dragging marker updates Firestore & table inputs
         marker.on('dragend', async e => {
-          const { lat: newLat, lng: newLon } = e.target.getLatLng();
+          const { lat:newLat, lng:newLon } = e.target.getLatLng();
           await col.doc(doc.id).update({ lat:newLat, lon:newLon });
-          row.querySelectorAll('td input')[2].value = newLat;
-          row.querySelectorAll('td input')[3].value = newLon;
+          const inputs = row.querySelectorAll('td input');
+          inputs[2].value = newLat;
+          inputs[3].value = newLon;
+        });
+
+        // clicking the **table row** will fire that marker’s click event
+        row.addEventListener('click', e => {
+          // ignore clicks on the Save/Delete buttons
+          if (e.target.tagName === 'BUTTON') return;
+          marker.fire('click');
+          marker.openPopup();
         });
 
         markers[doc.id] = marker;
       });
     }
 
-    // ─── add‐station form ────────────────────────────────────────
+    // ─── Add‐station form ─────────────────────────────────────────────
     addForm.onsubmit = async e => {
       e.preventDefault();
       const code    = document.getElementById('newCode').value.trim();
@@ -170,11 +191,13 @@
       const lat     = parseFloat(document.getElementById('newLat').value);
       const lon     = parseFloat(document.getElementById('newLon').value);
       if (!code) return alert('Code required');
+
       await col.doc(code).set({ address, lat, lon });
-      init();    // re-load everything
+      init();
       addForm.reset();
     };
 
+    // ─── Kick it off ─────────────────────────────────────────────────
     init();
   </script>
 </body>
