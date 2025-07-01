@@ -17,7 +17,6 @@
     th, td { border:1px solid #ccc; padding:6px; }
     th { background:#f5f5f5; }
     tr:hover { background:#fafafa; }
-    /* highlight selected row */
     tr.selected { background: #d0e7ff !important; }
     input { width:100%; box-sizing:border-box; }
     button { margin:0 4px; }
@@ -89,22 +88,21 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><input class="code"  value="${code}" disabled></td>
-        <td><input class="addr"  value="${address}"></td>
-        <td><input class="lat"   type="number" step="any" value="${lat}"></td>
-        <td><input class="lon"   type="number" step="any" value="${lon}"></td>
+        <td><input class="addr"  value="${address}" disabled></td>
+        <td><input class="lat"   type="number" step="any" value="${lat}" disabled></td>
+        <td><input class="lon"   type="number" step="any" value="${lon}" disabled></td>
         <td>
-          <button class="save" data-idx="${idx}">Save</button>
+          <button class="edit" data-idx="${idx}">Edit</button>
+          <button class="save" data-idx="${idx}" style="display:none">Save</button>
           <button class="del"  data-idx="${idx}">Delete</button>
         </td>`;
       tbody.appendChild(tr);
 
       // clicking row highlights & pops up marker
       tr.addEventListener('click', () => {
-        // clear any previously selected
         document.querySelectorAll('tbody tr.selected')
           .forEach(r => r.classList.remove('selected'));
         tr.classList.add('selected');
-        // open its popup
         markers[idx].fire('click');
       });
 
@@ -117,16 +115,13 @@
         const popup = `
           <strong>${code}</strong><br>
           ${address}<br>
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
-             target="_blank">Navigate</a>
-          | <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
-          | <a href="#" class="del-note" data-idx="${idx}">Delete Note</a>
-          | <a href="#" class="undo-note" data-idx="${idx}" style="display:none">Undo</a>
-          | <a href="#" class="adjust" data-idx="${idx}">Adjust Pin</a>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank">Navigate</a>
+          | <a href="#" class="note-btn"   data-idx="${idx}">Add/Edit Note</a>
+          | <a href="#" class="del-note"   data-idx="${idx}">Delete Note</a>
+          | <a href="#" class="undo-note"  data-idx="${idx}" style="display:none">Undo</a>
+          | <a href="#" class="adjust"     data-idx="${idx}">Adjust Pin</a>
           <br>
-          <div id="note-display-${idx}" style="font-style:italic;color:#555">
-            ${note}
-          </div>`;
+          <div id="note-display-${idx}" style="font-style:italic;color:#555">${note}</div>`;
         map.once('moveend', () => m.bindPopup(popup).openPopup());
         map.setView([lat, lon], 17, { animate:true, duration:0.8 });
       });
@@ -136,22 +131,26 @@
     const snap = await db.collection('pumpStations').get();
     snap.docs.forEach((doc,i) => addStation(doc,i));
 
-    // ─── Table Save / Delete
+    // ─── Table Edit / Save / Delete
     tbody.addEventListener('click', async e => {
       const idx = +e.target.dataset.idx;
-      if (e.target.matches('.save')) {
-        const tr = tbody.children[idx];
+      const tr = tbody.children[idx];
+      if (e.target.matches('.edit')) {
+        // enable inputs & swap buttons
+        tr.querySelectorAll('input').forEach(i=>i.disabled=false);
+        tr.querySelector('.edit').style.display = 'none';
+        tr.querySelector('.save').style.display = '';
+      }
+      else if (e.target.matches('.save')) {
         const code = tr.querySelector('.code').value;
         const newAddress = tr.querySelector('.addr').value.trim();
         const newLat     = parseFloat(tr.querySelector('.lat').value);
         const newLon     = parseFloat(tr.querySelector('.lon').value);
-        await db.collection('pumpStations').doc(code).update({
-          address:newAddress, lat:newLat, lon:newLon
-        });
+        await db.collection('pumpStations').doc(code).update({ address:newAddress, lat:newLat, lon:newLon });
         alert('Saved');
         location.reload();
       }
-      if (e.target.matches('.del')) {
+      else if (e.target.matches('.del')) {
         const code = tbody.children[idx].querySelector('.code').value;
         if (!confirm(`Delete ${code}?`)) return;
         await db.collection('pumpStations').doc(code).delete();
@@ -165,20 +164,15 @@
       const idx = +e.target.dataset.idx;
       if (isNaN(idx)) return;
       const code = docs[idx].id;
-
-      // Add/Edit note
       if (e.target.matches('.note-btn')) {
         e.preventDefault();
         const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
         const txt = prompt(`Note for ${code}:`, cur);
         if (txt!==null) {
-          await db.collection('notes').doc(code)
-            .set({ text:txt, updated:firebase.firestore.FieldValue.serverTimestamp() });
-          document.getElementById(`note-display-${idx}`)
-                  .textContent = txt;
+          await db.collection('notes').doc(code).set({ text:txt, updated:firebase.firestore.FieldValue.serverTimestamp() });
+          document.getElementById(`note-display-${idx}`).textContent = txt;
         }
       }
-      // Delete note
       if (e.target.matches('.del-note')) {
         e.preventDefault();
         const snapN = await db.collection('notes').doc(code).get();
@@ -187,17 +181,13 @@
         document.getElementById(`note-display-${idx}`).textContent = '';
         e.target.nextElementSibling.style.display = 'inline';
       }
-      // Undo note
       if (e.target.matches('.undo-note')) {
         e.preventDefault();
-        await db.collection('notes').doc(code)
-          .set({ text:tempDel[code], updated:firebase.firestore.FieldValue.serverTimestamp() });
-        document.getElementById(`note-display-${idx}`)
-                .textContent = tempDel[code];
+        await db.collection('notes').doc(code).set({ text:tempDel[code], updated:firebase.firestore.FieldValue.serverTimestamp() });
+        document.getElementById(`note-display-${idx}`).textContent = tempDel[code];
         e.target.style.display='none';
         delete tempDel[code];
       }
-      // Adjust pin
       if (e.target.matches('.adjust')) {
         e.preventDefault();
         const m = markers[idx];
@@ -207,8 +197,7 @@
         } else {
           m.dragging.disable();
           const { lat, lng } = m.getLatLng();
-          await db.collection('pumpStations').doc(code)
-            .update({ lat, lon:lng });
+          await db.collection('pumpStations').doc(code).update({ lat, lon:lng });
           alert('Pin moved');
           location.reload();
         }
