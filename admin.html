@@ -9,45 +9,57 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
+  <!-- Leaflet & Geocoder CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
+  />
+
   <style>
-    body { font-family: sans-serif; margin:20px; }
+    body { font-family:sans-serif; margin:20px; }
     h1 { margin-bottom:10px; }
-    table { border-collapse: collapse; width:100%; margin-bottom:20px; }
-    th, td { border:1px solid #ccc; padding:8px; text-align:left; }
+    form   { margin-bottom:10px; }
+    input  { margin-right:8px; }
+    #adminMap { height:300px; margin-bottom:20px; border:1px solid #ccc; }
+    table { border-collapse:collapse; width:100%; }
+    th,td { border:1px solid #ccc; padding:8px; }
     th { background:#f5f5f5; }
-    input { width: 100%; box-sizing: border-box; }
     button { margin-right:8px; }
-    #addForm input { width:auto; margin-right:8px; }
   </style>
 </head>
 <body>
   <h1>Pump Stations Admin</h1>
 
   <form id="addForm">
-    <input type="text" id="newCode" placeholder="Code (e.g. PS#315)" required>
+    <input type="text" id="newCode"    placeholder="Code (e.g. PS#315)" required>
     <input type="text" id="newAddress" placeholder="Address" required>
-    <input type="number" id="newLat" placeholder="Latitude" step="any" required>
-    <input type="number" id="newLon" placeholder="Longitude" step="any" required>
+    <input type="number" id="newLat"    placeholder="Latitude" step="any" required>
+    <input type="number" id="newLon"    placeholder="Longitude" step="any" required>
     <button type="submit">Add Station</button>
   </form>
+
+  <!-- map for geocoding & pin placement -->
+  <div id="adminMap"></div>
 
   <table id="stationsTable">
     <thead>
       <tr>
-        <th>Code</th>
-        <th>Address</th>
-        <th>Latitude</th>
-        <th>Longitude</th>
-        <th>Actions</th>
+        <th>Code</th><th>Address</th><th>Latitude</th><th>Longitude</th><th>Actions</th>
       </tr>
     </thead>
-    <tbody>
-      <!-- rows injected here -->
-    </tbody>
+    <tbody></tbody>
   </table>
 
+  <!-- Leaflet & Geocoder JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
   <script>
-    // ─── Firebase init ─────────────────────────────────────────────────
+    // ─── Firebase init ────────────────────────────────────────────────
     firebase.initializeApp({
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -57,83 +69,107 @@
       appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
       measurementId:     "G-HHX1X8KFSF"
     });
-    const db = firebase.firestore();
+    const db  = firebase.firestore();
     const col = db.collection('pumpStations');
 
-    const tableBody = document.querySelector('#stationsTable tbody');
-    const addForm   = document.getElementById('addForm');
+    const newCode    = document.getElementById('newCode');
+    const newAddress = document.getElementById('newAddress');
+    const newLat     = document.getElementById('newLat');
+    const newLon     = document.getElementById('newLon');
+    const addForm    = document.getElementById('addForm');
+    const tbody      = document.querySelector('#stationsTable tbody');
 
-    // ─── Render one row ────────────────────────────────────────────────
-    function renderRow(doc, index){
+    // ─── Leaflet map + geocoder ───────────────────────────────────────
+    const adminMap = L.map('adminMap').setView([40.73, -73.28], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap contributors'
+    }).addTo(adminMap);
+
+    let adminMarker = null;
+    const geocoder = L.Control.geocoder({
+      defaultMarkGeocode: false
+    })
+    .on('markgeocode', e => {
+      const center = e.geocode.center;
+
+      // remove old marker
+      if (adminMarker) adminMap.removeLayer(adminMarker);
+
+      // place new draggable marker
+      adminMarker = L.marker(center, { draggable:true }).addTo(adminMap);
+
+      // fill form fields
+      newAddress.value = e.geocode.name;
+      newLat.value     = center.lat.toFixed(6);
+      newLon.value     = center.lng.toFixed(6);
+
+      adminMap.fitBounds(e.geocode.bbox);
+
+      // update coords on drag
+      adminMarker.on('dragend', () => {
+        const p = adminMarker.getLatLng();
+        newLat.value = p.lat.toFixed(6);
+        newLon.value = p.lng.toFixed(6);
+      });
+    })
+    .addTo(adminMap);
+
+    // ─── Render station rows ──────────────────────────────────────────
+    function renderRow(doc) {
       const tr = document.createElement('tr');
       tr.dataset.id = doc.id;
-
-      // make cells editable inputs
       tr.innerHTML = `
         <td><input value="${doc.id}" /></td>
         <td><input value="${doc.data().address}" /></td>
-        <td><input value="${doc.data().lat}" type="number" step="any" /></td>
-        <td><input value="${doc.data().lon}" type="number" step="any" /></td>
+        <td><input value="${doc.data().lat}"  type="number" step="any" /></td>
+        <td><input value="${doc.data().lon}"  type="number" step="any" /></td>
         <td>
           <button class="save">Save</button>
           <button class="delete">Delete</button>
         </td>
       `;
-
-      // Save handler
+      // save / delete...
       tr.querySelector('.save').onclick = async () => {
-        const inputs = tr.querySelectorAll('input');
-        const newCode    = inputs[0].value.trim();
-        const newAddress = inputs[1].value.trim();
-        const newLat     = parseFloat(inputs[2].value);
-        const newLon     = parseFloat(inputs[3].value);
-
-        // If code (doc.id) changed, we need to copy+delete
-        if (newCode !== doc.id){
-          const data = { code: newCode, address:newAddress, lat:newLat, lon:newLon };
-          await col.doc(newCode).set(data);
+        const [c,a,lt,ln] = tr.querySelectorAll('input');
+        const newC = c.value.trim(),
+              newA = a.value.trim(),
+              newL = parseFloat(lt.value),
+              newG = parseFloat(ln.value);
+        if(newC!==doc.id) {
+          await col.doc(newC).set({ code:newC,address:newA,lat:newL,lon:newG });
           await col.doc(doc.id).delete();
-          tr.dataset.id = newCode;
+          tr.dataset.id = newC;
         } else {
-          await col.doc(doc.id).update({
-            address:newAddress,
-            lat:newLat,
-            lon:newLon
-          });
+          await col.doc(doc.id).update({ address:newA,lat:newL,lon:newG });
         }
         alert('Saved');
       };
-
-      // Delete handler
       tr.querySelector('.delete').onclick = async () => {
-        if (confirm(`Delete station "${doc.id}"?`)){
+        if(confirm(`Delete "${doc.id}"?`)) {
           await col.doc(doc.id).delete();
           tr.remove();
         }
       };
-
-      tableBody.appendChild(tr);
+      tbody.appendChild(tr);
     }
 
-    // ─── Load all stations on startup ─────────────────────────────────
-    col.get().then(snapshot => {
-      snapshot.forEach((doc,i) => renderRow(doc,i));
-    });
+    // ─── Load existing stations ────────────────────────────────────────
+    col.get().then(snap => snap.forEach(d=>renderRow(d)));
 
-    // ─── Add new station form ─────────────────────────────────────────
+    // ─── Add form handler ─────────────────────────────────────────────
     addForm.onsubmit = async e => {
       e.preventDefault();
-      const code    = document.getElementById('newCode').value.trim();
-      const address = document.getElementById('newAddress').value.trim();
-      const lat     = parseFloat(document.getElementById('newLat').value);
-      const lon     = parseFloat(document.getElementById('newLon').value);
-
+      const code = newCode.value.trim();
       if(!code) return alert('Code required');
-      await col.doc(code).set({ code, address, lat, lon });
-      // re-render freshly:
-      const doc = await col.doc(code).get();
-      renderRow(doc);
+      await col.doc(code).set({
+        address:newAddress.value,
+        lat:parseFloat(newLat.value),
+        lon:parseFloat(newLon.value)
+      });
+      const d = await col.doc(code).get();
+      renderRow(d);
       addForm.reset();
+      if(adminMarker) adminMap.removeLayer(adminMarker);
     };
   </script>
 </body>
