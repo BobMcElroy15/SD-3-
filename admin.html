@@ -26,9 +26,46 @@
       overflow: hidden;
     }
 
-    #app-layout { display: flex; height: 100vh; }
-    #side-panel { width: 420px; background-color: #ffffff; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-shadow: 0 0 15px rgba(0,0,0,0.1); z-index: 10; }
-    #map-container { flex-grow: 1; position: relative; }
+    /* ** RESPONSIVE LAYOUT ** */
+    /* Mobile First (Default) */
+    #app-layout {
+      display: flex;
+      flex-direction: column; /* Stacks map on top of panel */
+      height: 100vh;
+    }
+    
+    #map-container {
+      height: 45vh; /* Map takes top 45% of the screen */
+      position: relative;
+    }
+    
+    #side-panel {
+      flex-grow: 1; /* Panel takes the rest of the screen */
+      background-color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden; /* Important for child scrolling */
+    }
+
+    /* Desktop Layout (for screens wider than 991px) */
+    @media (min-width: 992px) {
+      #app-layout {
+        flex-direction: row; /* Side-by-side layout */
+      }
+      #map-container {
+        order: 2; /* Map appears on the right */
+        height: 100vh;
+        flex-grow: 1;
+      }
+      #side-panel {
+        order: 1; /* Panel appears on the left */
+        width: 420px;
+        flex-grow: 0;
+        border-right: 1px solid var(--border-color);
+        box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      }
+    }
+    
     #map { height: 100%; width: 100%; }
 
     /* Header */
@@ -38,52 +75,30 @@
     #logoutBtn:hover { background-color: var(--danger-color); color: white; }
 
     /* Scrollable Content Area */
-    #panel-content { overflow-y: auto; padding: 1rem; }
-    #panel-content h2 { 
-        font-size: 1.1rem; /* Smaller heading */
-        margin-bottom: 0.75rem; /* Reduced margin */
-    }
+    #panel-content { overflow-y: auto; padding: 1rem; flex-grow: 1;}
+    #panel-content h2 { font-size: 1.1rem; margin-bottom: 0.75rem; }
     #addFromSearch { display: none; background: var(--light-primary); padding: 15px; border-radius: 8px; margin-bottom: 1rem; }
     #addFromSearch p { margin: 0 0 10px 0; font-weight: 500; }
     #addFromSearch button { background: var(--success-color); color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 1rem; }
 
-    /* Station List - ** COMPACT CHANGES HERE ** */
+    /* Station List */
     #stationList { list-style-type: none; padding: 0; margin: 0; }
-    #stationList li { 
-      background: #fff; 
-      margin-bottom: 0.5rem; /* Reduced margin */
-      padding: 0.75rem; /* Reduced padding */
-      border-radius: 8px; 
-      border: 1px solid var(--border-color); 
-      cursor: pointer; 
-      transition: box-shadow 0.2s, border-color 0.2s; 
-    }
-    #stationList li:hover { border-color: var(--primary-color); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    #stationList li { background: #fff; margin-bottom: 0.5rem; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer; transition: box-shadow 0.2s, border-color 0.2s; }
+    #stationList li:hover { border-color: var(--primary-color); }
     #stationList li.selected { border-color: var(--primary-color); background-color: var(--light-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    #stationList .info-line { 
-        font-weight: 500; 
-        margin-bottom: 0.25rem; /* Reduced margin */
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; /* Changed to center for better icon alignment */
-    }
+    #stationList .info-line { font-weight: 500; margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: center; }
     #stationList .coords-line { font-size: 0.8rem; color: var(--muted-color); }
     
-    /* Note Section - ** COMPACT CHANGES HERE ** */
-    .note-section { 
-        background: var(--light-gray); 
-        padding: 0.5rem 0.75rem; /* Reduced padding */
-        margin-top: 0.5rem; /* Reduced margin */
-        border-radius: 5px; 
-    }
+    /* Note Section */
+    .note-section { background: var(--light-gray); padding: 0.5rem 0.75rem; margin-top: 0.5rem; border-radius: 5px; }
     .note-text { font-style: italic; color: var(--muted-color); margin: 0 0 8px 0; font-size: 0.9rem; word-wrap: break-word; }
     .note-text .no-note { color: #aaa; }
     .note-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .note-header span { font-weight: 500; font-size: 0.9rem; color: var(--muted-color); }
 
     /* Icon Button Styles */
-    .icon-actions { display: flex; gap: 0.25rem; /* Reduced gap */ }
-    .icon-btn { background: none; border: none; cursor: pointer; padding: 4px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; transition: background-color 0.2s; }
+    .icon-actions { display: flex; gap: 0.25rem; }
+    .icon-btn { background: none; border: none; cursor: pointer; padding: 5px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; transition: background-color 0.2s; }
     .icon-btn:hover { background-color: var(--border-color); }
     .icon-btn svg { width: 16px; height: 16px; }
     .icon-btn.edit-btn svg { fill: var(--primary-color); }
@@ -105,6 +120,9 @@
   </div>
 
   <div id="app-layout" style="display: none;">
+    <main id="map-container">
+      <div id="map"></div>
+    </main>
     <aside id="side-panel">
       <header id="panel-header">
         <h1>Pump Station Management</h1>
@@ -119,9 +137,6 @@
         <ul id="stationList"></ul>
       </div>
     </aside>
-    <main id="map-container">
-      <div id="map"></div>
-    </main>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -200,8 +215,9 @@
     };
     
     // --- Main App Logic (Map and Stations) ---
+    // The rest of the JavaScript is unchanged.
     function initializeMap() {
-        if (map) return;
+        if (map) { map.invalidateSize(); return; }
         map = L.map('map').setView([40.730889, -73.284654], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
@@ -221,7 +237,6 @@
             addFromSearchUI.style.display = 'block';
         }).addTo(map);
     }
-
     function getPopupContent(id, address, isMoving = false) {
         const moveLink = `<button title="Move Pin" class="icon-btn popup-link move-pin-btn" data-id="${id}">${icons.move}</button>`;
         const movingUI = `<div class="icon-actions">
@@ -230,7 +245,6 @@
                           </div>`;
         return `<strong>${id}</strong><br>${address}<hr style="margin: 4px 0;">${isMoving ? movingUI : moveLink}`;
     }
-    
     async function getStations() {
       stationList.innerHTML = '';
       if (markers) {
@@ -238,7 +252,6 @@
       }
       markers = {};
       const snapshot = await db.collection('pumpStations').orderBy('__name__').get();
-      
       for (const doc of snapshot.docs) {
         const station = doc.data();
         const code = doc.id;
@@ -256,7 +269,6 @@
             }
             map.flyTo(marker.getLatLng(), 18);
         });
-
         const li = document.createElement('li');
         li.dataset.id = code;
         li.innerHTML = `
@@ -286,7 +298,6 @@
         stationList.appendChild(li);
       }
     }
-
     addSearchedStationBtn.addEventListener('click', async () => {
         if (!lastSearchResult) return;
         const code = prompt("Please enter the unique code for this new station:", "S-");
@@ -297,15 +308,12 @@
             getStations();
         }
     });
-
     document.body.addEventListener('click', async (e) => {
         const btn = e.target.closest('.icon-btn');
         if (!btn) return;
-
         e.preventDefault();
         const id = btn.dataset.id;
         const marker = markers[id];
-
         if (btn.classList.contains('move-pin-btn')) {
             originalPinPositions[id] = marker.getLatLng();
             marker.dragging.enable();
@@ -326,13 +334,11 @@
             marker.closePopup();
         }
     });
-
     stationList.addEventListener('click', async (e) => {
       const li = e.target.closest('li');
       if (!li) return;
       const id = li.dataset.id;
       const btn = e.target.closest('.icon-btn');
-
       if (!btn) {
         document.querySelectorAll('#stationList li').forEach(item => item.classList.remove('selected'));
         li.classList.add('selected');
@@ -343,7 +349,6 @@
         }
         return;
       }
-      
       if (btn.classList.contains('edit-btn') && !btn.classList.contains('edit-note-btn')) {
         const currentAddress = li.querySelector('.address-text').textContent;
         const newAddress = prompt("Enter new address:", currentAddress);
