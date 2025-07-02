@@ -4,37 +4,50 @@
   <meta charset="utf-8">
   <title>Pump Stations Admin</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <!-- Leaflet & Geocoder CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
   <style>
-    body { margin:0; padding:0; font-family:sans-serif; }
-    h1 { margin:10px; }
-    #map { height: 45vh; min-height: 200px; border-bottom: 1px solid #ccc; }
-    #stationsTable { height: 50vh; overflow-y: auto; }
-    #stationsTable table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #ccc; padding: 6px; }
-    th { background: #f5f5f5; }
-    tr:hover, tr.highlight { background: #d0eaff !important; }
-    input[readonly] { background: #f5f5f5; border: none; }
-    button { margin: 0 4px; }
-    #loginDiv { display: flex; flex-direction: column; gap: 7px; align-items: flex-start; margin: 30px 20px; }
-    #logoutBtn { margin: 10px 20px; }
-    .actions button { min-width: 60px; }
-    #noStationsMsg { color: #888; text-align: center; padding: 1em 0; }
+    body { margin:0; padding:0; font-family:sans-serif; background: #f5f7fa; }
+    h1 { margin:20px 0 10px 0; }
+    #adminUI { display: none; }
+    #map { height:50vh; margin: 0; border-bottom: 1px solid #ccc;}
+    #stationsTable { height:45vh; overflow-y:auto; background: #fff; border-radius: 0 0 8px 8px;}
+    table { width:100%; border-collapse:collapse; }
+    th, td { border:1px solid #e0e6ef; padding:7px 6px; }
+    th { background:#f0f5fb; font-weight:600; font-size: 15px;}
+    tr { transition: background 0.18s; }
+    tr.selected, tr.highlight, tr:hover { background: #e3f1ff !important; }
+    input { width:100%; box-sizing:border-box; font-size:15px; padding: 5px 8px; border: 1px solid #c6d6ea; border-radius: 4px; background: #f8fbfd;}
+    input[disabled] { color: #888; background: #f7f7f7;}
+    button { margin:0 2px; padding: 5px 14px; border: none; border-radius: 4px; font-size:14px; cursor:pointer; background: #1976d2; color: #fff; }
+    button.delete { background: #e53935;}
+    button.cancel { background: #aaa;}
+    button.save { background: #43a047;}
+    button.adjust, button.adjust-cancel { background: #00bcd4;}
+    button[disabled] {opacity:0.7; cursor:not-allowed;}
+    .actions { white-space:nowrap; }
+    .search-row { background:#f5f5f5;}
+    #loginDiv { display: flex; flex-direction:column; align-items: center; justify-content: center; height:100vh; }
+    #loginDiv input { width: 220px; margin:8px 0; }
+    #loginDiv button { width: 220px;}
+    #signOutBtn { margin: 10px 0 0 0; }
   </style>
 </head>
 <body>
-  <!-- Login form -->
-  <div id="loginDiv" style="display:none">
-    <h2>Admin Login</h2>
-    <input id="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Password">
-    <button id="loginBtn">Sign In</button>
-    <div id="loginMsg" style="color:red"></div>
+  <!-- Login Form -->
+  <div id="loginDiv">
+    <h2>Pump Station Admin Login</h2>
+    <input id="email" type="email" placeholder="Email" autocomplete="username"/>
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password"/>
+    <button id="signInBtn">Sign In</button>
+    <div id="loginError" style="color:#d32f2f; margin-top:8px;"></div>
   </div>
 
-  <div id="adminUI" style="display:none">
-    <button id="logoutBtn">Sign Out</button>
+  <!-- Admin UI -->
+  <div id="adminUI">
+    <button id="signOutBtn">Sign Out</button>
     <h1>Pump Stations Admin</h1>
     <div id="map"></div>
     <div id="stationsTable">
@@ -45,25 +58,29 @@
             <th>Address</th>
             <th>Lat</th>
             <th>Lon</th>
-            <th>Actions</th>
+            <th class="actions">Actions</th>
+          </tr>
+          <tr class="search-row">
+            <th colspan="5" style="background:#f5f5f5;">
+              <input id="searchInput" placeholder="Search address or code..." autocomplete="off" style="width: 99%;">
+              <div id="suggestions" style="position:relative;z-index:10;"></div>
+            </th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
-      <div id="noStationsMsg" style="display:none;">No stations found.</div>
     </div>
   </div>
 
-  <!-- SDKs -->
+  <!-- Scripts -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
   <script>
-  // ==== Firebase Config & Init ====
+  // ---- Firebase Config ----
   firebase.initializeApp({
     apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
     authDomain:        "sd3ps-map.firebaseapp.com",
@@ -76,222 +93,278 @@
   const auth = firebase.auth();
   const db   = firebase.firestore();
 
-  // === Auth UI Logic ===
+  // ---- UI Elements ----
   const loginDiv  = document.getElementById('loginDiv');
   const adminUI   = document.getElementById('adminUI');
-  const loginMsg  = document.getElementById('loginMsg');
-  const loginBtn  = document.getElementById('loginBtn');
-  const logoutBtn = document.getElementById('logoutBtn');
-  const noStationsMsg = document.getElementById('noStationsMsg');
+  const signInBtn = document.getElementById('signInBtn');
+  const signOutBtn= document.getElementById('signOutBtn');
+  const loginError= document.getElementById('loginError');
+  const emailIn   = document.getElementById('email');
+  const passIn    = document.getElementById('password');
+  const tbody     = document.querySelector('#stationsTable tbody');
+  const searchInput = document.getElementById('searchInput');
+  const suggestions = document.getElementById('suggestions');
 
-  loginBtn.onclick = async function() {
-    loginMsg.textContent = '';
+  // ---- State ----
+  let markers = [], docs = [], map, currentRow = null, pinAdjustIdx = null;
+  const tempDel = {};
+
+  // ---- Firebase Auth ----
+  signInBtn.onclick = async () => {
     try {
-      await auth.signInWithEmailAndPassword(
-        document.getElementById('email').value,
-        document.getElementById('password').value
-      );
-    } catch(e) {
-      loginMsg.textContent = e.message;
+      await auth.signInWithEmailAndPassword(emailIn.value, passIn.value);
+      loginError.textContent = '';
+      emailIn.value = '';
+      passIn.value = '';
+    } catch (e) {
+      loginError.textContent = e.message.replace('Firebase:', '');
     }
   };
-  logoutBtn.onclick = function() { auth.signOut(); };
+  signOutBtn.onclick = () => auth.signOut();
 
-  // Show/hide UI depending on login state
+  // ---- Auth State Handler ----
   auth.onAuthStateChanged(user => {
     if (user) {
       loginDiv.style.display = 'none';
-      adminUI.style.display  = '';
-      loadAdminUI();
+      adminUI.style.display = '';
+      setTimeout(loadAdminUI, 10); // Important: let DOM render #map before map init!
     } else {
-      adminUI.style.display  = 'none';
+      adminUI.style.display = 'none';
       loginDiv.style.display = '';
       clearMapAndTable();
     }
   });
 
-  // === Main Admin UI Logic ===
-  let markers = [], docs = [], map = null;
+  // ---- Clear Map and Table ----
   function clearMapAndTable() {
-    if (window.map) {
-      window.map.remove();
-      window.map = null;
-    }
-    document.querySelector('#stationsTable tbody').innerHTML = '';
-    if (noStationsMsg) noStationsMsg.style.display = 'none';
+    if (markers && markers.length) markers.forEach(m => m.remove());
     markers = [];
     docs = [];
+    if (map) { try { map.remove(); } catch{} }
+    tbody.innerHTML = '';
   }
 
-  function loadAdminUI() {
+  // ---- Main UI Loader ----
+  async function loadAdminUI() {
     clearMapAndTable();
-    // --- Map + Geocoder
-    map = window.map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap contributors' }).addTo(map);
-    L.Control.geocoder({ placeholder: 'Search address…' })
-      .on('markgeocode', e => map.setView(e.geocode.center, 17))
-      .addTo(map);
+    // Init map
+    map = L.map('map').setView([40.730889, -73.284654], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap contributors'
+    }).addTo(map);
 
-    markers = []; docs = [];
-    const tbody = document.querySelector('#stationsTable tbody');
+    // Geocoder search control on map
+    const geocoder = L.Control.geocoder({
+      placeholder: 'Search address...',
+      defaultMarkGeocode: false
+    }).on('markgeocode', e => {
+      map.setView(e.geocode.center, 17);
+    }).addTo(map);
 
-    function addStation(doc, idx) {
-      const code = doc.id;
-      let { address, lat, lon } = doc.data();
-      docs[idx] = doc;
+    // Load all stations
+    const snap = await db.collection('pumpStations').get();
+    docs = snap.docs;
+    markers = [];
+    tbody.innerHTML = '';
+    docs.forEach((doc, i) => addStationRowAndMarker(doc, i));
 
-      // Table row
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input class="code"  value="${code}" readonly></td>
-        <td><input class="addr"  value="${address}" readonly></td>
-        <td><input class="lat"   type="number" step="any" value="${lat}" readonly></td>
-        <td><input class="lon"   type="number" step="any" value="${lon}" readonly></td>
-        <td class="actions">
-          <button class="edit"  data-idx="${idx}">Edit</button>
-          <button class="save"  data-idx="${idx}" style="display:none;">Save</button>
-          <button class="cancel"data-idx="${idx}" style="display:none;">Cancel</button>
-          <button class="del"   data-idx="${idx}">Delete</button>
-        </td>`;
-      tbody.appendChild(tr);
-
-      // Row click: highlight & show marker popup
-      tr.onclick = function(e) {
-        // Avoid if clicking an action button
-        if (e.target.tagName === "BUTTON" || e.target.tagName === "INPUT") return;
-        markers.forEach(mk => mk.setZIndexOffset(0));
-        markers[idx].setZIndexOffset(1000);
-        markers[idx].fire('click');
-        document.querySelectorAll('#stationsTable tbody tr').forEach(r=>r.classList.remove('highlight'));
-        tr.classList.add('highlight');
-        tr.scrollIntoView({behavior:'smooth',block:'nearest'});
-      };
-
-      // Map marker
-      const m = L.marker([lat, lon]).addTo(map);
-      markers[idx] = m;
-      m.on('click', async () => {
-        const ns = await db.collection('notes').doc(code).get();
-        const note = ns.exists ? ns.data().text : '';
-        const popup = `
-          <strong>${code}</strong><br>
-          ${address}<br>
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
-             target="_blank">Navigate</a>
-          | <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
-          | <a href="#" class="del-note" data-idx="${idx}">Delete Note</a>
-          | <a href="#" class="undo-note" data-idx="${idx}" style="display:none">Undo</a>
-          | <a href="#" class="adjust-pin" data-idx="${idx}">Adjust Pin</a>
-          <br>
-          <div id="note-display-${idx}" style="font-style:italic;color:#555">
-            ${note}
-          </div>`;
-        map.once('moveend', ()=> m.bindPopup(popup).openPopup());
-        map.setView([lat, lon],17,{animate:true,duration:0.8});
-        // Highlight table
-        document.querySelectorAll('#stationsTable tbody tr').forEach(r=>r.classList.remove('highlight'));
-        tr.classList.add('highlight');
-        tr.scrollIntoView({behavior:'smooth',block:'nearest'});
+    // Smart search bar with suggestions
+    searchInput.oninput = function() {
+      const val = this.value.toLowerCase();
+      suggestions.innerHTML = '';
+      if (!val) return;
+      let count = 0;
+      docs.forEach((doc, i) => {
+        const d = doc.data();
+        if (d.address.toLowerCase().includes(val) || doc.id.toLowerCase().includes(val)) {
+          if (++count > 10) return;
+          const div = document.createElement('div');
+          div.style.cursor = 'pointer';
+          div.style.padding = '4px 8px';
+          div.style.background = '#f5f5f5';
+          div.style.borderBottom = '1px solid #eee';
+          div.textContent = `${doc.id} – ${d.address}`;
+          div.onclick = () => {
+            searchInput.value = '';
+            suggestions.innerHTML = '';
+            selectRow(i, true);
+          };
+          suggestions.appendChild(div);
+        }
       });
-    }
-
-    // --- Load all stations
-    db.collection('pumpStations').get().then(snap=>{
-      if (!snap.empty) {
-        snap.docs.forEach((doc,i)=> addStation(doc,i));
-        noStationsMsg.style.display = 'none';
-      } else {
-        noStationsMsg.style.display = '';
-      }
-    }).catch(e=>{
-      noStationsMsg.style.display = '';
-      noStationsMsg.textContent = "Error loading stations: " + e.message;
-      console.error(e);
-    });
-
-    // --- Table Edit/Save/Cancel/Delete
-    tbody.onclick = async function(e) {
-      const idx = +e.target.dataset.idx;
-      const tr  = tbody.children[idx];
-      const code= tr.querySelector('.code').value;
-      if (e.target.matches('.edit')) {
-        tr.querySelectorAll('input').forEach(input => { if (input.className !== 'code') input.readOnly = false; });
-        tr.querySelector('.edit').style.display   = 'none';
-        tr.querySelector('.save').style.display   = '';
-        tr.querySelector('.cancel').style.display = '';
-      }
-      if (e.target.matches('.cancel')) location.reload();
-      if (e.target.matches('.save')) {
-        const newAddress = tr.querySelector('.addr').value.trim();
-        const newLat     = parseFloat(tr.querySelector('.lat').value);
-        const newLon     = parseFloat(tr.querySelector('.lon').value);
-        await db.collection('pumpStations').doc(code).update({
-          address:newAddress, lat:newLat, lon:newLon
-        });
-        alert('Saved');
-        location.reload();
-      }
-      if (e.target.matches('.del')) {
-        if (!confirm(`Delete ${code}?`)) return;
-        await db.collection('pumpStations').doc(code).delete();
-        alert('Deleted');
-        location.reload();
-      }
     };
+    searchInput.onblur = ()=> setTimeout(()=> suggestions.innerHTML='', 200);
+  }
 
-    // --- Popup note & adjust-pin
-    document.body.onclick = async function(e) {
-      if (!e.target.dataset.idx) return;
-      const idx = +e.target.dataset.idx;
-      const code = docs[idx].id;
-      // Add/Edit note
-      if (e.target.matches('.note-btn')){
-        e.preventDefault();
-        const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
-        const txt = prompt(`Note for ${code}:`,cur);
-        if (txt!==null){
-          await db.collection('notes').doc(code)
-            .set({ text:txt, updated:firebase.firestore.FieldValue.serverTimestamp() });
-          document.getElementById(`note-display-${idx}`).textContent=txt;
-        }
-      }
-      // Delete note
-      if (e.target.matches('.del-note')){
-        e.preventDefault();
-        const snapN = await db.collection('notes').doc(code).get();
-        window.tempDel = window.tempDel || {};
-        window.tempDel[code] = snapN.exists? snapN.data().text:'';
-        await db.collection('notes').doc(code).delete();
-        document.getElementById(`note-display-${idx}`).textContent='';
-        e.target.nextElementSibling.style.display='inline';
-      }
-      // Undo note
-      if (e.target.matches('.undo-note')){
-        e.preventDefault();
-        await db.collection('notes').doc(code)
-          .set({ text:window.tempDel[code], updated:firebase.firestore.FieldValue.serverTimestamp() });
-        document.getElementById(`note-display-${idx}`).textContent=window.tempDel[code];
-        e.target.style.display='none';
-        delete window.tempDel[code];
-      }
-      // Adjust Pin
-      if (e.target.matches('.adjust-pin')){
-        e.preventDefault();
-        const m = markers[idx];
-        if (!m.dragging.enabled()){
-          m.dragging.enable();
-          e.target.textContent='Save Pin';
-        } else {
-          m.dragging.disable();
-          const {lat,lng} = m.getLatLng();
-          await db.collection('pumpStations').doc(code)
-            .update({ lat, lon:lng });
-          alert('Pin moved');
-          location.reload();
-        }
-      }
+  // ---- Add Station Row + Marker ----
+  function addStationRowAndMarker(doc, idx) {
+    const code = doc.id;
+    let { address, lat, lon } = doc.data();
+
+    // --- Table Row ---
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input class="code"  value="${code}" disabled></td>
+      <td><input class="addr"  value="${address}" disabled></td>
+      <td><input class="lat"   type="number" step="any" value="${lat}" disabled></td>
+      <td><input class="lon"   type="number" step="any" value="${lon}" disabled></td>
+      <td class="actions">
+        <button class="edit" data-idx="${idx}">Edit</button>
+        <button class="save" data-idx="${idx}" style="display:none;">Save</button>
+        <button class="cancel" data-idx="${idx}" style="display:none;">Cancel</button>
+        <button class="delete" data-idx="${idx}">Delete</button>
+        <button class="adjust" data-idx="${idx}">Adjust Pin</button>
+      </td>`;
+    tbody.appendChild(tr);
+
+    // --- Marker ---
+    const m = L.marker([lat, lon]).addTo(map);
+    markers[idx] = m;
+    m.on('click', () => selectRow(idx, true));
+
+    // --- Highlight row if pin clicked; show popup ---
+    tr.onclick = e => {
+      // Ignore clicks on buttons so only row click selects
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+      selectRow(idx, true);
     };
   }
-  </script>
-</body>
-</html>
+
+  // ---- Row Selection / Pin Selection ----
+  async function selectRow(idx, fromMap) {
+    // Remove old
+    tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+    if (typeof idx === "number") {
+      const tr = tbody.children[idx];
+      tr.classList.add('selected');
+      if (!fromMap) markers[idx].openPopup();
+      // Marker popup
+      const code = docs[idx].id;
+      let { address, lat, lon } = docs[idx].data();
+      const ns = await db.collection('notes').doc(code).get();
+      const note = ns.exists ? ns.data().text : '';
+      const popup = `
+        <strong>${code}</strong><br>
+        ${address}<br>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank">Navigate</a>
+        | <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
+        | <a href="#" class="del-note" data-idx="${idx}">Delete Note</a>
+        | <a href="#" class="undo-note" data-idx="${idx}" style="display:none">Undo</a>
+        | <a href="#" class="adjust" data-idx="${idx}">Adjust Pin</a>
+        <br>
+        <div id="note-display-${idx}" style="font-style:italic;color:#555">${note}</div>
+      `;
+      markers[idx].bindPopup(popup).openPopup();
+      map.setView([lat, lon], 17, { animate: true, duration: 0.7 });
+      tr.scrollIntoView({ behavior:'smooth', block:'nearest'});
+    }
+  }
+
+  // ---- Table Actions ----
+  tbody.addEventListener('click', async function(e) {
+    const idx = +e.target.dataset.idx;
+    if (isNaN(idx)) return;
+    const tr = tbody.children[idx];
+    const code = tr.querySelector('.code').value;
+    let { address, lat, lon } = docs[idx].data();
+
+    // --- Edit ---
+    if (e.target.classList.contains('edit')) {
+      // Only one row editable at a time
+      tbody.querySelectorAll('input:not(.code)').forEach(inp => inp.disabled = true);
+      tbody.querySelectorAll('.save,.cancel').forEach(btn => btn.style.display = 'none');
+      tbody.querySelectorAll('.edit').forEach(btn => btn.style.display = '');
+      tbody.querySelectorAll('.adjust').forEach(btn => btn.disabled = false);
+
+      ['addr','lat','lon'].forEach(cls => tr.querySelector('.'+cls).disabled = false);
+      tr.querySelector('.edit').style.display = 'none';
+      tr.querySelector('.save').style.display = '';
+      tr.querySelector('.cancel').style.display = '';
+      tr.querySelector('.adjust').disabled = false;
+    }
+    // --- Save ---
+    if (e.target.classList.contains('save')) {
+      const newAddress = tr.querySelector('.addr').value.trim();
+      const newLat     = parseFloat(tr.querySelector('.lat').value);
+      const newLon     = parseFloat(tr.querySelector('.lon').value);
+      await db.collection('pumpStations').doc(code).update({
+        address: newAddress, lat: newLat, lon: newLon
+      });
+      alert('Saved');
+      loadAdminUI();
+    }
+    // --- Cancel ---
+    if (e.target.classList.contains('cancel')) {
+      loadAdminUI();
+    }
+    // --- Delete ---
+    if (e.target.classList.contains('delete')) {
+      if (!confirm(`Delete ${code}?`)) return;
+      await db.collection('pumpStations').doc(code).delete();
+      alert('Deleted');
+      loadAdminUI();
+    }
+    // --- Adjust Pin ---
+    if (e.target.classList.contains('adjust')) {
+      const m = markers[idx];
+      if (!m.dragging.enabled()) {
+        m.dragging.enable();
+        e.target.textContent = "Save Pin";
+        e.target.classList.add('adjust-cancel');
+        tr.querySelector('.save').disabled = true;
+        tr.querySelector('.cancel').disabled = true;
+        tbody.querySelectorAll('.edit, .delete').forEach(b => b.disabled = true);
+      } else {
+        m.dragging.disable();
+        e.target.textContent = "Adjust Pin";
+        e.target.classList.remove('adjust-cancel');
+        tr.querySelector('.save').disabled = false;
+        tr.querySelector('.cancel').disabled = false;
+        tbody.querySelectorAll('.edit, .delete').forEach(b => b.disabled = false);
+        const {lat,lng} = m.getLatLng();
+        await db.collection('pumpStations').doc(code).update({ lat, lon:lng });
+        alert('Pin moved');
+        loadAdminUI();
+      }
+    }
+  });
+
+  // ---- Popup note & adjust-pin handlers
+  document.body.addEventListener('click', async function(e){
+    const idx = +e.target.dataset.idx;
+    if (isNaN(idx)) return;
+    const code = docs[idx].id;
+
+    // --- Add/Edit note
+    if (e.target.classList.contains('note-btn')){
+      e.preventDefault();
+      const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
+      const txt = prompt(`Note for ${code}:`, cur);
+      if (txt!==null){
+        await db.collection('notes').doc(code)
+          .set({ text:txt, updated:firebase.firestore.FieldValue.serverTimestamp() });
+        document.getElementById(`note-display-${idx}`).textContent=txt;
+      }
+    }
+    // --- Delete note
+    if (e.target.classList.contains('del-note')){
+      e.preventDefault();
+      const snapN = await db.collection('notes').doc(code).get();
+      tempDel[code] = snapN.exists? snapN.data().text:'';
+      await db.collection('notes').doc(code).delete();
+      document.getElementById(`note-display-${idx}`).textContent='';
+      e.target.nextElementSibling.style.display='inline';
+    }
+    // --- Undo note
+    if (e.target.classList.contains('undo-note')){
+      e.preventDefault();
+      await db.collection('notes').doc(code)
+        .set({ text:tempDel[code], updated:firebase.firestore.FieldValue.serverTimestamp() });
+      document.getElementById(`note-display-${idx}`).textContent=tempDel[code];
+      e.target.style.display='none';
+      delete tempDel[code];
+    }
+    // --- Adjust pin in popup (optional, but keeps in sync)
+    if (e.target.classList.contains('adjust')){
+      e.preventDefault();
+      const m = markers
