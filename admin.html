@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <title>Pump Stations Admin</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <!-- Firebase & Leaflet & Geocoder CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
   <style>
@@ -74,7 +73,6 @@
   });
   const auth = firebase.auth();
   const db   = firebase.firestore();
-  // =====
 
   // === Auth UI Logic ===
   const loginDiv  = document.getElementById('loginDiv');
@@ -105,18 +103,26 @@
     } else {
       adminUI.style.display  = 'none';
       loginDiv.style.display = '';
+      clearMapAndTable();
     }
   });
 
-  // ==== Main Admin UI Logic ====
-  let markers = [], docs = [];
-  function loadAdminUI() {
-    // Clear map/table
+  // === Main Admin UI Logic ===
+  let markers = [], docs = [], map = null;
+  function clearMapAndTable() {
+    if (window.map) {
+      window.map.remove();
+      window.map = null;
+    }
     document.querySelector('#stationsTable tbody').innerHTML = '';
-    if (window.map) window.map.remove();
+    markers = [];
+    docs = [];
+  }
 
+  function loadAdminUI() {
+    clearMapAndTable();
     // --- Map + Geocoder
-    window.map = L.map('map').setView([40.730889, -73.284654], 12);
+    map = window.map = L.map('map').setView([40.730889, -73.284654], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap contributors' }).addTo(map);
     L.Control.geocoder({ placeholder: 'Search address…' })
       .on('markgeocode', e => map.setView(e.geocode.center, 17))
@@ -124,7 +130,6 @@
 
     markers = []; docs = [];
     const tbody = document.querySelector('#stationsTable tbody');
-
     // --- Add one station row + marker
     function addStation(doc, idx) {
       const code = doc.id;
@@ -147,11 +152,13 @@
       tbody.appendChild(tr);
 
       // Row click: highlight & show marker popup
-      tr.onclick = e => {
+      tr.onclick = function(e) {
+        // Avoid if clicking an action button
+        if (e.target.tagName === "BUTTON" || e.target.tagName === "INPUT") return;
         markers.forEach(mk => mk.setZIndexOffset(0));
         markers[idx].setZIndexOffset(1000);
         markers[idx].fire('click');
-        document.querySelectorAll('tr').forEach(r=>r.classList.remove('highlight'));
+        document.querySelectorAll('#stationsTable tbody tr').forEach(r=>r.classList.remove('highlight'));
         tr.classList.add('highlight');
         tr.scrollIntoView({behavior:'smooth',block:'nearest'});
       };
@@ -179,7 +186,7 @@
         map.once('moveend', ()=> m.bindPopup(popup).openPopup());
         map.setView([lat, lon],17,{animate:true,duration:0.8});
         // Highlight table
-        document.querySelectorAll('tr').forEach(r=>r.classList.remove('highlight'));
+        document.querySelectorAll('#stationsTable tbody tr').forEach(r=>r.classList.remove('highlight'));
         tr.classList.add('highlight');
         tr.scrollIntoView({behavior:'smooth',block:'nearest'});
       });
@@ -191,7 +198,7 @@
     });
 
     // --- Table Edit/Save/Cancel/Delete
-    tbody.onclick = async e => {
+    tbody.onclick = async function(e) {
       const idx = +e.target.dataset.idx;
       const tr  = tbody.children[idx];
       const code= tr.querySelector('.code').value;
@@ -221,7 +228,7 @@
     };
 
     // --- Popup note & adjust-pin
-    document.body.onclick = async e => {
+    document.body.onclick = async function(e) {
       if (!e.target.dataset.idx) return;
       const idx = +e.target.dataset.idx;
       const code = docs[idx].id;
