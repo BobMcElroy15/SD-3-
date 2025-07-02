@@ -65,7 +65,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
   <script>
-    // Firebase config
+    // Firebase config (leave unchanged)
     firebase.initializeApp({
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -79,7 +79,6 @@
     const db   = firebase.firestore();
     const analytics = firebase.analytics();
 
-    // DOM refs
     const loginContainer = document.getElementById('loginContainer');
     const adminUI        = document.getElementById('adminUI');
     const emailInput     = document.getElementById('email');
@@ -87,7 +86,11 @@
     const loginBtn       = document.getElementById('loginBtn');
     const loginError     = document.getElementById('loginError');
 
-    // Login click handler
+    // --- ONLY for testing: always start signed out
+    // Comment out after your first good login!
+    auth.signOut();
+
+    // Login button
     loginBtn.onclick = async () => {
       loginError.textContent = '';
       try {
@@ -101,18 +104,23 @@
     };
 
     // Listen for auth state changes
-    auth.onAuthStateChanged(user => {
+    auth.onAuthStateChanged(async user => {
       if (user) {
         loginContainer.style.display = 'none';
         adminUI.style.display = '';
         if (!window._adminLoaded) {
           window._adminLoaded = true;
-          initAdmin();
+          try {
+            await initAdmin();
+          } catch (e) {
+            adminUI.innerHTML = "<div style='color:red'>Failed to load admin. " + e + "</div>";
+          }
         }
       } else {
         loginContainer.style.display = '';
         adminUI.style.display = 'none';
         window._adminLoaded = false;
+        passInput.value = '';
       }
     });
 
@@ -130,8 +138,6 @@
 
       const markers = [], docs = [], tempDel = {};
       const tbody = document.querySelector('#stationsTable tbody');
-
-      // Clear table
       tbody.innerHTML = '';
 
       // Add station (table row and pin)
