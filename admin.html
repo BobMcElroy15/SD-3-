@@ -21,100 +21,49 @@
       text-align: center;
     }
     #auth-form {
-      background: white;
-      padding: 30px;
-      border-radius: 8px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      width: 320px;
+      background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 320px;
     }
     #auth-form input {
-      width: calc(100% - 22px);
-      padding: 10px;
-      margin-bottom: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
+      width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;
     }
     #auth-form button {
-      width: 100%;
-      font-size: 16px;
-      padding: 12px;
-      cursor: pointer;
-      background-color: #0066cc;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      margin-top: 10px;
+      width: 100%; font-size: 16px; padding: 12px; cursor: pointer; background-color: #0066cc; color: white; border: none; border-radius: 5px; margin-top: 10px;
     }
     #auth-form a {
-        color: #0066cc;
-        cursor: pointer;
-        display: block;
-        margin-top: 15px;
+        color: #0066cc; cursor: pointer; display: block; margin-top: 15px;
     }
     #auth-error {
-        color: red;
-        margin-top: 10px;
-        min-height: 20px;
+        color: red; margin-top: 10px; min-height: 20px;
     }
 
     /* Main Content Styling */
     #main-content { display: none; }
     #header { display: flex; justify-content: space-between; align-items: center; }
     #header button {
-        background-color: #dc3545;
-        color: white;
-        padding: 8px 12px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
+        background-color: #dc3545; color: white; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer;
+    }
+
+    /* Add from Search Section */
+    #addFromSearch {
+        display: none; background: #e7f3ff; padding: 15px; border-radius: 5px; margin-top: 20px; border-left: 5px solid #0066cc;
+    }
+    #addFromSearch p { margin: 0 0 10px 0; }
+    #addFromSearch button {
+        background: #28a745; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;
     }
 
     #stationList { list-style-type: none; padding: 0; }
     #stationList li {
-      background: #fff;
-      margin-bottom: 10px;
-      padding: 15px;
-      border-radius: 5px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      cursor: pointer;
+      background: #fff; margin-bottom: 10px; padding: 15px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-left: 5px solid transparent; transition: background-color 0.2s, border-left 0.2s;
     }
     #stationList li.selected {
-        background-color: #e7f3ff;
-        border-left: 5px solid #0066cc;
+        background-color: #e7f3ff; border-left: 5px solid #0066cc;
     }
     .station-actions button {
-      margin-left: 10px;
-      padding: 8px 12px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+      margin-left: 10px; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer;
     }
     .save-btn { background-color: #28a745; color: white; }
     .delete-btn { background-color: #dc3545; color: white; }
-
-    #addStationForm {
-      background: #fff;
-      padding: 20px;
-      border-radius: 5px;
-      margin-top: 20px;
-    }
-    #addStationForm input {
-      width: calc(100% - 22px);
-      padding: 10px;
-      margin-bottom: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    #addStationForm button {
-      background: #0066cc;
-      color: white;
-      padding: 10px 15px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
   </style>
 </head>
 <body>
@@ -137,15 +86,10 @@
         <h1>Pump Station Management</h1>
         <button id="logoutBtn">Sign Out</button>
       </div>
-      <a href="index.html">← Back to Main Map</a>
-
-      <div id="addStationForm">
-        <h2>Add New Station (Search on map to pre-fill)</h2>
-        <input type="text" id="stationCode" placeholder="Station Code (e.g., A1)">
-        <input type="text" id="stationAddress" placeholder="Address">
-        <input type="text" id="stationLat" placeholder="Latitude">
-        <input type="text" id="stationLon" placeholder="Longitude">
-        <button id="addBtn">Add Station</button>
+      
+      <div id="addFromSearch">
+          <p><strong>Add new station:</strong> <span id="searchedAddress"></span></p>
+          <button id="addSearchedStationBtn">Add Searched Location</button>
       </div>
 
       <h2>Existing Stations</h2>
@@ -175,12 +119,20 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // DOM & Map Refs
+    // DOM & State Refs
     const authContainer = document.getElementById('auth-container');
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
+    const stationList = document.getElementById('stationList');
+    const addFromSearchUI = document.getElementById('addFromSearch');
+    const searchedAddressSpan = document.getElementById('searchedAddress');
+    const addSearchedStationBtn = document.getElementById('addSearchedStationBtn');
     
-    // Auth Form Refs
+    let map;
+    let markers = {};
+    let lastSearchResult = null; // Store the last searched location
+
+    // --- Authentication Logic (Unchanged) ---
     const authForm = document.getElementById('auth-form');
     const formTitle = document.getElementById('form-title');
     const emailInput = document.getElementById('emailInput');
@@ -188,20 +140,8 @@
     const authBtn = document.getElementById('authBtn');
     const switchFormLink = document.getElementById('switch-form');
     const authError = document.getElementById('auth-error');
-    
-    // Rest of the App Refs
-    const stationList = document.getElementById('stationList');
-    const addBtn = document.getElementById('addBtn');
-    const codeInput = document.getElementById('stationCode');
-    const addressInput = document.getElementById('stationAddress');
-    const latInput = document.getElementById('stationLat');
-    const lonInput = document.getElementById('stationLon');
-    
-    let map;
-    let markers = {};
     let isSignUp = false;
 
-    // --- Authentication Logic ---
     switchFormLink.addEventListener('click', () => {
         isSignUp = !isSignUp;
         formTitle.textContent = isSignUp ? 'Create Account' : 'Admin Sign In';
@@ -213,58 +153,47 @@
     authBtn.addEventListener('click', () => {
         const email = emailInput.value;
         const password = passwordInput.value;
-        authError.textContent = ''; // Clear previous errors
-
-        if (isSignUp) {
-            // Create a new account
-            auth.createUserWithEmailAndPassword(email, password)
-                .catch(error => {
-                    authError.textContent = error.message;
-                });
-        } else {
-            // Sign in an existing user
-            auth.signInWithEmailAndPassword(email, password)
-                .catch(error => {
-                    authError.textContent = error.message;
-                });
-        }
+        authError.textContent = '';
+        const authAction = isSignUp ? auth.createUserWithEmailAndPassword(email, password) : auth.signInWithEmailAndPassword(email, password);
+        authAction.catch(error => { authError.textContent = error.message; });
     });
 
     logoutBtn.addEventListener('click', () => auth.signOut());
 
     auth.onAuthStateChanged(user => {
       if (user) {
-        // User is signed in
         authContainer.style.display = 'none';
         mainContent.style.display = 'block';
         initializeMap();
         getStations();
       } else {
-        // User is signed out
         authContainer.style.display = 'flex';
         mainContent.style.display = 'none';
+        if(map) { map.remove(); map = null; }
       }
     });
 
     // --- Main App Logic (Map and Stations) ---
-    // (This part of the code is the same as the previous version)
-
     function initializeMap() {
-        if (map) return; // Prevent re-initializing
+        if (map) return;
         map = L.map('map').setView([40.730889, -73.284654], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        const geocoder = L.Control.geocoder({
-            defaultMarkGeocode: false,
+        L.Control.geocoder({
+            defaultMarkGeocode: true,
             placeholder: 'Search for address...',
         }).on('markgeocode', function(e) {
             const { center, name } = e.geocode;
             map.fitBounds(e.geocode.bbox);
-            addressInput.value = name.split(',').slice(0, 2).join(',');
-            latInput.value = center.lat;
-            lonInput.value = center.lng;
+            lastSearchResult = {
+                address: name.split(',').slice(0, 2).join(','),
+                lat: center.lat,
+                lon: center.lng,
+            };
+            searchedAddressSpan.textContent = lastSearchResult.address;
+            addFromSearchUI.style.display = 'block';
         }).addTo(map);
     }
     
@@ -282,79 +211,8 @@
         marker.bindPopup(`<strong>${code}</strong><br/>${station.address}`);
         markers[code] = marker;
 
-        marker.on('dragend', function(event) {
-          const position = event.target.getLatLng();
-          const saveButton = document.querySelector(`button.save-btn[data-id="${code}"]`);
-          if (saveButton) {
-            saveButton.style.display = 'inline-block';
-            document.getElementById(`lat-span-${code}`).textContent = position.lat.toFixed(6);
-            document.getElementById(`lon-span-${code}`).textContent = position.lng.toFixed(6);
-          }
-        });
-
-        const li = document.createElement('li');
-        li.dataset.id = code;
-        li.innerHTML = `
-          <span>
-            <strong>${code}</strong> - ${station.address} 
-            (<span id="lat-span-${code}">${station.lat.toFixed(4)}</span>, <span id="lon-span-${code}">${station.lon.toFixed(4)}</span>)
-          </span>
-          <span class="station-actions">
-            <button class="save-btn" data-id="${code}" style="display:none;">Save Coords</button>
-            <button class="delete-btn" data-id="${code}">Delete</button>
-          </span>
-        `;
-        stationList.appendChild(li);
-      });
-    }
-
-    addBtn.addEventListener('click', async () => {
-      const code = codeInput.value.trim().toUpperCase();
-      const address = addressInput.value.trim();
-      const lat = parseFloat(latInput.value);
-      const lon = parseFloat(lonInput.value);
-
-      if (code && address && !isNaN(lat) && !isNaN(lon)) {
-        await db.collection('pumpStations').doc(code).set({ address, lat, lon });
-        codeInput.value = '';
-        addressInput.value = '';
-        latInput.value = '';
-        lonInput.value = '';
-        getStations();
-      } else {
-        alert('Please fill out all fields correctly.');
-      }
-    });
-
-    stationList.addEventListener('click', async (e) => {
-      const li = e.target.closest('li');
-      if (!li) return;
-
-      const id = li.dataset.id;
-      
-      document.querySelectorAll('#stationList li').forEach(item => item.classList.remove('selected'));
-      li.classList.add('selected');
-      const marker = markers[id];
-      if (marker) {
-        map.setView(marker.getLatLng(), 16);
-        marker.openPopup();
-      }
-
-      if (e.target.classList.contains('delete-btn')) {
-        if (confirm(`Are you sure you want to delete station ${id}?`)) {
-          await db.collection('pumpStations').doc(id).delete();
-          getStations();
-        }
-      }
-
-      if (e.target.classList.contains('save-btn')) {
-        const newLat = parseFloat(document.getElementById(`lat-span-${id}`).textContent);
-        const newLon = parseFloat(document.getElementById(`lon-span-${id}`).textContent);
-        await db.collection('pumpStations').doc(id).update({ lat: newLat, lon: newLon });
-        e.target.style.display = 'none';
-        alert(`Station ${id} location updated!`);
-      }
-    });
-  </script>
-</body>
-</html>
+        // **NEW**: Click a pin to highlight the list item
+        marker.on('click', function() {
+            document.querySelectorAll('#stationList li').forEach(item => item.classList.remove('selected'));
+            const listItem = document.querySelector(`#stationList li[data-id="${code}"]`);
+            if (listItem) {
