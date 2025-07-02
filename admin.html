@@ -52,6 +52,10 @@
     #addFromSearch button {
         background: #28a745; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;
     }
+    
+    /* Popup button styling */
+    .popup-link { cursor: pointer; color: #007bff; text-decoration: underline; }
+    .popup-link:hover { color: #0056b3; }
 
     #stationList { list-style-type: none; padding: 0; }
     #stationList li {
@@ -63,7 +67,6 @@
     .station-actions button {
       margin-left: 10px; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer;
     }
-    .save-location-btn { background-color: #28a745; color: white; }
     .edit-info-btn { background-color: #ffc107; }
     .delete-btn { background-color: #dc3545; color: white; }
   </style>
@@ -106,7 +109,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <script>
-    // Firebase Config & Init
     const firebaseConfig = {
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -119,7 +121,6 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // DOM & State Refs
     const authContainer = document.getElementById('auth-container');
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -131,8 +132,8 @@
     let map;
     let markers = {};
     let lastSearchResult = null;
+    let originalPinPositions = {};
 
-    // --- Authentication Logic (Unchanged) ---
     const authForm = document.getElementById('auth-form');
     const formTitle = document.getElementById('form-title');
     const emailInput = document.getElementById('emailInput');
@@ -169,7 +170,6 @@
       }
     });
 
-    // --- Main App Logic (Map and Stations) ---
     function initializeMap() {
         if (map) return;
         map = L.map('map').setView([40.730889, -73.284654], 12);
@@ -191,6 +191,16 @@
             addFromSearchUI.style.display = 'block';
         }).addTo(map);
     }
+
+    // Function to generate popup content based on the state
+    function getPopupContent(id, address, isMoving = false) {
+        const moveLink = `<a class="popup-link move-pin-btn" data-id="${id}">Move Pin</a>`;
+        const movingUI = `PIN UNLOCKED<br>
+                          <a class="popup-link save-location-popup-btn" data-id="${id}">Save Location</a> | 
+                          <a class="popup-link cancel-move-popup-btn" data-id="${id}">Cancel</a>`;
+        
+        return `<strong>${id}</strong><br>${address}<hr style="margin: 4px 0;">${isMoving ? movingUI : moveLink}`;
+    }
     
     async function getStations() {
       stationList.innerHTML = '';
@@ -200,8 +210,10 @@
       snapshot.forEach(doc => {
         const station = doc.data();
         const code = doc.id;
-        const marker = L.marker([station.lat, station.lon], { draggable: true }).addTo(map);
-        marker.bindPopup(`<strong>${code}</strong><br/>${station.address}`);
+        
+        // **Pins are no longer draggable by default**
+        const marker = L.marker([station.lat, station.lon], { draggable: false }).addTo(map);
+        marker.bindPopup(getPopupContent(code, station.address));
         markers[code] = marker;
 
         marker.on('click', function() {
@@ -213,16 +225,6 @@
             }
         });
 
-        marker.on('dragend', function(event) {
-          const position = event.target.getLatLng();
-          const saveButton = document.querySelector(`.save-location-btn[data-id="${code}"]`);
-          if (saveButton) {
-            saveButton.style.display = 'inline-block';
-            document.getElementById(`lat-span-${code}`).textContent = position.lat.toFixed(6);
-            document.getElementById(`lon-span-${code}`).textContent = position.lng.toFixed(6);
-          }
-        });
-
         const li = document.createElement('li');
         li.dataset.id = code;
         li.innerHTML = `
@@ -231,7 +233,6 @@
             (<span id="lat-span-${code}">${station.lat.toFixed(4)}</span>, <span id="lon-span-${code}">${station.lon.toFixed(4)}</span>)
           </span>
           <span class="station-actions">
-            <button class="save-location-btn" data-id="${code}" style="display:none;">Save Location</button>
             <button class="edit-info-btn" data-id="${code}">Edit Info</button>
             <button class="delete-btn" data-id="${code}">Delete</button>
           </span>
@@ -251,6 +252,46 @@
         }
     });
 
+    // Delegated click handler for the whole document
+    document.body.addEventListener('click', async (e) => {
+        const target = e.target;
+        
+        // **Handle "Move Pin" click in popup**
+        if (target.matches('.move-pin-btn')) {
+            e.preventDefault();
+            const id = target.dataset.id;
+            const marker = markers[id];
+            originalPinPositions[id] = marker.getLatLng(); // Store original position
+            marker.dragging.enable();
+            marker.getPopup().setContent(getPopupContent(id, marker.getPopup().getContent().split('<hr>')[0].split('<br>')[1], true));
+        }
+
+        // **Handle "Save Location" click in popup**
+        if (target.matches('.save-location-popup-btn')) {
+            e.preventDefault();
+            const id = target.dataset.id;
+            const marker = markers[id];
+            const newPos = marker.getLatLng();
+            marker.dragging.disable();
+            await db.collection('pumpStations').doc(id).update({ lat: newPos.lat, lon: newPos.lng });
+            marker.getPopup().setContent(getPopupContent(id, marker.getPopup().getContent().split('<hr>')[0].split('<br>')[1], false));
+            alert('Location updated!');
+            await getStations(); // Refresh list with new coordinates
+        }
+        
+        // **Handle "Cancel Move" click in popup**
+        if (target.matches('.cancel-move-popup-btn')) {
+            e.preventDefault();
+            const id = target.dataset.id;
+            const marker = markers[id];
+            marker.dragging.disable();
+            marker.setLatLng(originalPinPositions[id], {animate: false}); // Revert to original position
+            delete originalPinPositions[id];
+            marker.getPopup().setContent(getPopupContent(id, marker.getPopup().getContent().split('<hr>')[0].split('<br>')[1], false));
+        }
+    });
+
+
     stationList.addEventListener('click', async (e) => {
       const li = e.target.closest('li');
       if (!li) return;
@@ -264,31 +305,20 @@
         marker.openPopup();
       }
 
-      // Handle "Edit Info" button
       if (e.target.matches('.edit-info-btn')) {
         const currentAddress = li.querySelector('.address-text').textContent;
         const newAddress = prompt("Enter new address:", currentAddress);
         if (newAddress && newAddress !== currentAddress) {
           await db.collection('pumpStations').doc(id).update({ address: newAddress });
-          li.querySelector('.address-text').textContent = newAddress; // Update UI immediately
           alert('Address updated!');
+          await getStations();
         }
       }
 
-      // Handle "Save Location" button
-      if (e.target.matches('.save-location-btn')) {
-        const newLat = parseFloat(document.getElementById(`lat-span-${id}`).textContent);
-        const newLon = parseFloat(document.getElementById(`lon-span-${id}`).textContent);
-        await db.collection('pumpStations').doc(id).update({ lat: newLat, lon: newLon });
-        e.target.style.display = 'none'; // Hide button after saving
-        alert(`Station ${id} location updated!`);
-      }
-
-      // Handle "Delete" button
       if (e.target.matches('.delete-btn')) {
         if (confirm(`Are you sure you want to delete station ${id}?`)) {
           await db.collection('pumpStations').doc(id).delete();
-          getStations(); // Refresh everything
+          await getStations();
         }
       }
     });
