@@ -1,240 +1,262 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Sewer District 3 Pump Station Map</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0066cc">
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-  <style>
-    body { margin:0; padding:0; }
-    #map { height:100vh; }
+  <meta charset="utf-8">
+  <title>Sewer District 3 Pump Station Map</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0066cc">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <style>
+    body { margin:0; padding:0; }
+    #map { height:100vh; }
 
-    /* seal, zoom controls, buttons, title, dropdown, overlay styling */
-    #seal { position:absolute; top:10px; left:10px; width:70px; z-index:1000; }
-    .leaflet-control-zoom.leaflet-bar {
-      position:absolute!important; top:80px!important; left:10px!important; z-index:1000;
-    }
-    #shareBtn,#installBtn {
-      position:absolute; left:80px; z-index:1000;
-      background:#0066cc; color:#fff; padding:8px 12px;
-      border:none; border-radius:4px; font-size:14px;
-      cursor:pointer;
-    }
-    #shareBtn { top:85px; }
-    #installBtn { top:120px; display:none; }
+    /* seal, zoom controls, buttons, title, dropdown, overlay styling */
+    #seal { position:absolute; top:10px; left:10px; width:70px; z-index:1000; }
+    .leaflet-control-zoom.leaflet-bar {
+      position:absolute!important; top:80px!important; left:10px!important; z-index:1000;
+    }
+    #shareBtn,#installBtn {
+      position:absolute; left:80px; z-index:1000;
+      background:#0066cc; color:#fff; padding:8px 12px;
+      border:none; border-radius:4px; font-size:14px;
+      cursor:pointer;
+    }
+    #shareBtn { top:85px; }
+    #installBtn { top:120px; display:none; }
 
-    #title {
-      position:absolute; top:10px; left:80px; right:5%;
-      background:#fff; padding:6px; border-radius:6px;
-      font-size:18px; font-weight:bold; text-align:center;
-      z-index:900;
-    }
+    #title {
+      position:absolute; top:10px; left:80px; right:5%;
+      background:#fff; padding:6px; border-radius:6px;
+      font-size:18px; font-weight:bold; text-align:center;
+      z-index:900;
+    }
 
-    /* Station dropdown */
-    #stationSelect {
-      position:absolute!important;
-      top:50px!important; left:80px!important;
-      width:300px!important;    /* fixed width */
-      background:#fff; padding:6px;
-      border-radius:6px; font-size:14px;
-      z-index:900;
-    }
+    /* Station dropdown */
+    #stationSelect {
+      position:absolute!important;
+      top:50px!important; left:80px!important;
+      width:300px!important;    /* fixed width */
+      background:#fff; padding:6px;
+      border-radius:6px; font-size:14px;
+      z-index:900;
+    }
 
-    /* Admin link positioned to the right of dropdown */
-    #adminLink {
-      position:absolute;
-      top:50px;
-      left: calc(80px + 300px + 10px); /* 80px from left + 300px width + 10px gap */
-      font-size:12px; color:#0066cc;
-      text-decoration:none; background:rgba(255,255,255,0.8);
-      padding:2px 6px; border-radius:4px; z-index:1001;
-    }
-    #adminLink:hover { background:rgba(0,102,204,0.1); }
+    /* Admin link positioned to the right of dropdown */
+    #adminLink {
+      position:absolute;
+      top:50px;
+      left: calc(80px + 300px + 10px); /* 80px from left + 300px width + 10px gap */
+      font-size:12px; color:#0066cc;
+      text-decoration:none; background:rgba(255,255,255,0.8);
+      padding:2px 6px; border-radius:4px; z-index:1001;
+    }
+    #adminLink:hover { background:rgba(0,102,204,0.1); }
 
-    /* Share Overlay */
-    #shareOverlay {
-      position:fixed; top:0; left:0; width:100%; height:100%;
-      background:rgba(0,0,0,0.7); display:none;
-      align-items:center; justify-content:center; z-index:2000;
-    }
-    #shareOverlayContent {
-      background:#fff; padding:20px; border-radius:8px; text-align:center;
-    }
-    #shareOverlayContent img { max-width:80vw; }
-    #closeShare {
-      margin-top:10px; padding:8px 12px;
-      background:#333; color:#fff; border:none; border-radius:4px;
-      cursor:pointer;
-    }
-  </style>
+    /* Share Overlay */
+    #shareOverlay {
+      position:fixed; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.7); display:none;
+      align-items:center; justify-content:center; z-index:2000;
+    }
+    #shareOverlayContent {
+      background:#fff; padding:20px; border-radius:8px; text-align:center;
+    }
+    #shareOverlayContent img { max-width:80vw; }
+    #closeShare {
+      margin-top:10px; padding:8px 12px;
+      background:#333; color:#fff; border:none; border-radius:4px;
+      cursor:pointer;
+    }
+  </style>
 </head>
 <body>
 
-    <img id="seal" src="FlatSeal200px.png" alt="County Seal">
-  <button id="shareBtn">Share</button>
-  <button id="installBtn">Install App</button>
+  <!-- Seal + Buttons -->
+  <img id="seal" src="FlatSeal200px.png" alt="County Seal">
+  <button id="shareBtn">Share</button>
+  <button id="installBtn">Install App</button>
 
-    <div id="title">Sewer District 3 Pump Station Map</div>
-  <select id="stationSelect">
-    <option value="">Select Pump Station</option>
-  </select>
-  <a id="adminLink" href="https://sd3psmaps.netlify.app/admin" target="_blank">Admin</a>
+  <!-- Title + Dropdown + Admin link -->
+  <div id="title">Sewer District 3 Pump Station Map</div>
+  <select id="stationSelect">
+    <option value="">Select Pump Station</option>
+  </select>
+  <a id="adminLink" href="https://sd3psmaps.netlify.app/admin" target="_blank">Admin</a>
 
-    <div id="shareOverlay">
-    <div id="shareOverlayContent">
-      <p>Scan to share:</p>
-      <img src="qr-code.png" alt="QR code"><br>
-      <button id="closeShare">Close</button>
-    </div>
-  </div>
+  <!-- Share Overlay -->
+  <div id="shareOverlay">
+    <div id="shareOverlayContent">
+      <p>Scan to share:</p>
+      <img src="qr-code.png" alt="QR code"><br>
+      <button id="closeShare">Close</button>
+    </div>
+  </div>
 
-    <div id="map"></div>
+  <!-- Map -->
+  <div id="map"></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
+  <!-- Leaflet & Firebase SDKs -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
-  <script>
-    // Firebase init
-    firebase.initializeApp({
-      apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
-      authDomain:        "sd3ps-map.firebaseapp.com",
-      projectId:         "sd3ps-map",
-      storageBucket:     "sd3ps-map.appspot.com",
-      messagingSenderId: "14976888367",
-      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
-      measurementId:     "G-HHX1X8KFSF"
-    });
-    const analytics = firebase.analytics();
-    const db        = firebase.firestore();
+  <script>
+    // Firebase init
+    firebase.initializeApp({
+      apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
+      authDomain:        "sd3ps-map.firebaseapp.com",
+      projectId:         "sd3ps-map",
+      storageBucket:     "sd3ps-map.appspot.com",
+      messagingSenderId: "14976888367",
+      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
+      measurementId:     "G-HHX1X8KFSF"
+    });
+    const analytics = firebase.analytics();
+    const db        = firebase.firestore();
 
-    // DOM refs
-    const installBtn    = document.getElementById('installBtn'),
-          shareBtn      = document.getElementById('shareBtn'),
-          closeShare    = document.getElementById('closeShare'),
-          stationSelect = document.getElementById('stationSelect');
+    // DOM refs
+    const installBtn    = document.getElementById('installBtn'),
+          shareBtn      = document.getElementById('shareBtn'),
+          closeShare    = document.getElementById('closeShare'),
+          stationSelect = document.getElementById('stationSelect');
 
-    // PWA install prompt
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault();
-      deferredPrompt = e;
-      installBtn.style.display = 'block';
-    });
-    installBtn.addEventListener('click', async () => {
-      installBtn.style.display = 'none';
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      deferredPrompt = null;
-    });
+    // PWA install prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'block';
+    });
+    installBtn.addEventListener('click', async () => {
+      installBtn.style.display = 'none';
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+    });
 
-    // Share overlay toggle
-    shareBtn.addEventListener('click', () => {
-      analytics.logEvent('share_click');
-      document.getElementById('shareOverlay').style.display = 'flex';
-    });
-    closeShare.addEventListener('click', () => {
-      document.getElementById('shareOverlay').style.display = 'none';
-    });
+    // Share overlay toggle
+    shareBtn.addEventListener('click', () => {
+      analytics.logEvent('share_click');
+      document.getElementById('shareOverlay').style.display = 'flex';
+    });
+    closeShare.addEventListener('click', () => {
+      document.getElementById('shareOverlay').style.display = 'none';
+    });
 
-    // ServiceWorker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(console.error);
-    }
+    // ServiceWorker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(console.error);
+    }
 
-    // Map setup
-    const map     = L.map('map').setView([40.730889, -73.284654], 12),
-          markers = [],
-          tempDel = {};
+    // Map setup
+    const map     = L.map('map').setView([40.730889, -73.284654], 12),
+          markers = [],
+          tempDel = {};
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      attribution:'© OpenStreetMap contributors'
-    }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap contributors'
+    }).addTo(map);
 
-    // Load & build stations
-    async function loadStations() {
-      markers.forEach(m => map.removeLayer(m));
-      markers.length = 0;
-      stationSelect.innerHTML = '<option value="">Select Pump Station</option>';
+    // Load & build stations
+    async function loadStations() {
+      markers.forEach(m => map.removeLayer(m));
+      markers.length = 0;
+      stationSelect.innerHTML = '<option value="">Select Pump Station</option>';
 
-      const snap = await db.collection('pumpStations').get();
-      snap.docs.forEach((doc, i) => {
-        const { address, lat, lon } = doc.data();
-        const code = doc.id;
+      const snap = await db.collection('pumpStations').get();
+      snap.docs.forEach((doc, i) => {
+        const { address, lat, lon } = doc.data();
+        const code = doc.id;
 
-        // dropdown
-        const opt = new Option(`${code} – ${address}`, i);
-        stationSelect.appendChild(opt);
+        // dropdown
+        const opt = new Option(`${code} – ${address}`, i);
+        stationSelect.appendChild(opt);
 
-        // marker
-        const m = L.marker([lat, lon]).addTo(map);
-        markers.push(m);
-        m.on('click', () => openPopup(i, code, address, lat, lon, m));
-      });
-    }
+        // marker
+        const m = L.marker([lat, lon]).addTo(map);
+        markers.push(m);
+        m.on('click', () => openPopup(i, code, address, lat, lon, m));
+      });
+    }
 
-    // Popup builder
-    async function openPopup(i, code, address, lat, lon, marker) {
-      const ns   = await db.collection('notes').doc(code).get();
-      const note = ns.exists ? ns.data().text : '';
+    // Popup builder
+    async function openPopup(i, code, address, lat, lon, marker) {
+      const ns   = await db.collection('notes').doc(code).get();
+      const note = ns.exists ? ns.data().text : '';
 
-      const html = `
-        <strong>${code}</strong><br>
-        ${address}<br>
-        <a href="https://maps.google.com/?q=${lat},${lon}"
-           target="_blank">Navigate</a>
-        | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
-        | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
-        | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo</a>
-        <br>
-        <div id="note-display-${i}"
-             style="margin-top:6px;font-style:italic;color:#555;">${note}</div>
-      `;
+      const html = `
+        <strong>${code}</strong><br>
+        ${address}<br>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+           target="_blank">Navigate</a>
+        | <a href="#" class="note-btn" data-idx="${i}">Add/Edit Note</a>
+        | <a href="#" class="delete-note-btn" data-idx="${i}">Delete Note</a>
+        | <a href="#" class="undo-note-btn" data-idx="${i}" style="display:none">Undo</a>
+        <br>
+        <div id="note-display-${i}"
+             style="margin-top:6px;font-style:italic;color:#555;">${note}</div>
+      `;
 
-      marker.bindPopup(html).openPopup();
-      map.setView([lat, lon], 17, { animate:true, duration:0.8 });
-    }
+      marker.bindPopup(html).openPopup();
+      map.setView([lat, lon], 17, { animate:true, duration:0.8 });
+    }
 
-    // dropdown → marker click
-    stationSelect.addEventListener('change', () => {
-      const i = +stationSelect.value;
-      if (i >= 0) {
-        analytics.logEvent('select_station');
-        markers[i].fire('click');
-      }
-    });
+    // dropdown → marker click
+    stationSelect.addEventListener('change', () => {
+      const i = +stationSelect.value;
+      if (i >= 0) {
+        analytics.logEvent('select_station');
+        markers[i].fire('click');
+      }
+    });
 
-    // notes CRUD & undo
-    document.body.addEventListener('click', async e => {
-      if (!e.target.dataset.idx) return;
-      const i    = +e.target.dataset.idx;
-      const code = stationSelect.options[i+1].text.split(' – ')[0];
+    // notes CRUD & undo
+    document.body.addEventListener('click', async e => {
+      if (!e.target.dataset.idx) return;
+      const i    = +e.target.dataset.idx;
+      const code = stationSelect.options[i+1].text.split(' – ')[0];
 
-      if (e.target.matches('.note-btn')) {
-        e.preventDefault();
-        const cur = (await db.collection('notes').doc(code).get()).data()?.text || '';
-        const txt = prompt(`Note for ${code}:`, cur);
-        if (txt!==null) {
-          await db.collection('notes').doc(code).set({
-            text: txt,
-            updated: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          document.getElementById(`note-display-${i}`).textContent = txt;
-        }
-      }
+      if (e.target.matches('.note-btn')) {
+        e.preventDefault();
+        const cur = (await db.collection('notes').doc(code).get()).data()?.text || '';
+        const txt = prompt(`Note for ${code}:`, cur);
+        if (txt!==null) {
+          await db.collection('notes').doc(code).set({
+            text: txt,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          document.getElementById(`note-display-${i}`).textContent = txt;
+        }
+      }
 
-      if (e.target.matches('.delete-note-btn')) {
-        e.preventDefault();
-        const docSnap = await db.collection('notes').doc(code).get();
-        // Fixed typo here
-        tempDel[code] = docSnap.exists ? docSnap.data().text : '';
-        await db.collection('notes').doc(code).delete();
-        document.getElementById(`note-display-${i}`).textContent = '';
-        e.target.nextElementSibling.style.display = 'inline';
-      }
+      if (e.target.matches('.delete-note-btn')) {
+        e.preventDefault();
+        const docSnap = await db.collection('notes').doc(code).get();
+        tempDel[code] = docSnap.exists ? docSnap.data().text : '';
+        await db.collection('notes').doc(code).delete();
+        document.getElementById(`note-display-${i}`).textContent = '';
+        e.target.nextElementSibling.style.display = 'inline';
+      }
+
+      if (e.target.matches('.undo-note-btn')) {
+        e.preventDefault();
+        await db.collection('notes').doc(code).set({
+          text: tempDel[code],
+          updated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        document.getElementById(`note-display-${i}`).textContent = tempDel[code];
+        e.target.style.display = 'none';
+        delete tempDel[code];
+      }
+    });
+
+    // initialize
+    loadStations();
+  </script>
+</body>
+</html>
