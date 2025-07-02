@@ -53,10 +53,7 @@
 
     /* Mobile First (Default) */
     #app-content { flex-direction: column; }
-    #map-container {
-      height: 50vh; /* Fixed map height on mobile */
-      flex-shrink: 0; 
-    }
+    #map-container { height: 60vh; flex-shrink: 0; }
     #side-panel {
       flex-grow: 1;
       display: flex;
@@ -152,7 +149,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/geocoders/ArcGIS.js"></script> <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
@@ -168,7 +165,7 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-    let map, markers = {}, tempMarker, mapObserver;
+    let map, markers = {}, tempMarker, mapObserver, originalPinPositions = {};
 
     const authContainer = document.getElementById('auth-container');
     const appLayout = document.getElementById('app-layout');
@@ -201,6 +198,9 @@
     const icons = {
         edit: `<svg viewBox="0 0 24 24"><path d="M14.06,9.02l.92.92L5.92,19H5v-.92l9.06-9.06M17.66,3c-.25,0-.51.1-.7.29l-1.83,1.83,3.75,3.75,1.83-1.83c.39-.39.39-1.02,0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29m-3.6,3.19L3,17.25V21h3.75L17.81,9.94l-3.75-3.75Z"/></svg>`,
         delete: `<svg viewBox="0 0 24 24"><path d="M6,19c0,1.1.9,2,2,2h8c1.1,0,2-.9,2-2V7H6v12M8,9h8v10H8V9m7.5-5l-1-1h-5l-1,1H5v2h14V4h-3.5Z"/></svg>`,
+        move: `<svg viewBox="0 0 24 24"><path d="M13,6V11h4.17l-4.59,4.59L8,11H12V6h1m7,6l-1.41,1.41L13,11.83V21h-2V11.83l-5.59,5.59L4,16l8-8,8,8Z"/></svg>`,
+        save: `<svg viewBox="0 0 24 24"><path d="M9,16.17L4.83,12l-1.42,1.41L9,19,21,7l-1.41-1.41L9,16.17Z"/></svg>`,
+        cancel: `<svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5,12,10.59,6.41,5,5,6.41,10.59,12,5,17.59,6.41,19,12,13.41,17.59,19,19,17.59,13.41,12,19,6.41Z"/></svg>`,
     };
     
     function initializeApp() {
@@ -222,12 +222,13 @@
         }).addTo(map);
 
         L.Control.geocoder({ 
+            geocoder: L.Control.Geocoder.arcgis(), // ** CHANGED ** Using ArcGIS for better suggestions
             defaultMarkGeocode: false,
-            placeholder: 'Search for an address...' 
+            placeholder: 'Search to add a new station...' 
         }).on('markgeocode', function(e) {
             if (tempMarker) map.removeLayer(tempMarker);
             const { center, name } = e.geocode;
-            const address = name.split(',').slice(0, 2).join(',');
+            const address = name.split(',').slice(0, 3).join(',');
             
             tempMarker = L.marker(center).addTo(map).bindPopup(`
                 <b>${address}</b><br><br>
@@ -235,7 +236,6 @@
             `).openPopup();
             
             tempMarker.locationData = { address: address, lat: center.lat, lon: center.lng };
-            
             map.flyTo(center, 16);
         }).addTo(map);
     }
@@ -244,6 +244,14 @@
         mapObserver = new ResizeObserver(() => map && map.invalidateSize());
         mapObserver.observe(mapContainer);
     }
+    
+    // ** RESTORED ** Function to create popup content with Move/Save/Cancel actions
+    function getPopupContent(id, address, isMoving = false) {
+        const moveLink = `<button title="Move Pin" class="icon-btn popup-link move-pin-btn" data-id="${id}">${icons.move}</button>`;
+        const movingUI = `<div class="icon-actions"><button title="Save Location" class="icon-btn popup-link save-location-popup-btn" data-id="${id}">${icons.save}</button><button title="Cancel Move" class="icon-btn popup-link cancel-move-popup-btn" data-id="${id}">${icons.cancel}</button></div>`;
+        return `<strong>${id}</strong><br>${address}<hr style="margin: 4px 0;">${isMoving ? movingUI : moveLink}`;
+    }
+
     async function getStations() {
       stationList.innerHTML = '';
       stationSelect.innerHTML = '<option value="">Select a station...</option>';
@@ -258,7 +266,8 @@
         option.value = code;
         option.textContent = `${code} - ${station.address}`;
         stationSelect.appendChild(option);
-        const marker = L.marker([station.lat, station.lon]).addTo(map);
+        const marker = L.marker([station.lat, station.lon], { draggable: false }).addTo(map);
+        marker.bindPopup(getPopupContent(code, station.address)); // Use helper function
         markers[code] = marker;
         marker.on('click', () => {
             const listItem = document.querySelector(`#stationList li[data-id="${code}"]`);
@@ -288,7 +297,32 @@
     }
     
     document.body.addEventListener('click', async (e) => {
-        if (e.target.closest('.add-station-popup-btn')) {
+        const iconBtn = e.target.closest('.icon-btn');
+        const addBtn = e.target.closest('.add-station-popup-btn');
+
+        if (iconBtn) { // Handle icon buttons
+            const id = iconBtn.dataset.id;
+            const marker = markers[id];
+            if (marker && iconBtn.closest('.leaflet-popup')) {
+                e.preventDefault();
+                if (iconBtn.classList.contains('move-pin-btn')) {
+                    originalPinPositions[id] = marker.getLatLng();
+                    marker.dragging.enable();
+                    marker.getPopup().setContent(getPopupContent(id, marker.getPopup().getContent().split('<hr>')[0].split('<br>')[1], true));
+                }
+                if (iconBtn.classList.contains('save-location-popup-btn')) {
+                    marker.dragging.disable();
+                    await db.collection('pumpStations').doc(id).update({ lat: marker.getLatLng().lat, lon: marker.getLatLng().lng });
+                    getStations();
+                }
+                if (iconBtn.classList.contains('cancel-move-popup-btn')) {
+                    marker.dragging.disable();
+                    marker.setLatLng(originalPinPositions[id]);
+                    delete originalPinPositions[id];
+                    marker.closePopup();
+                }
+            }
+        } else if (addBtn) { // Handle "Add This Location"
             if (tempMarker && tempMarker.locationData) {
                 const code = prompt("Please enter the unique code for this new station:", "S-");
                 if (code) {
@@ -314,6 +348,7 @@
         const marker = markers[id];
         if (marker) {
           map.flyTo(marker.getLatLng(), 18);
+          marker.openPopup();
         }
         return;
       }
