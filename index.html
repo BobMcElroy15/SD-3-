@@ -99,7 +99,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-check-compat.js"></script>
 
   <script>
     // Firebase init
@@ -112,13 +111,6 @@
       appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
       measurementId:     "G-HHX1X8KFSF"
     });
-
-    // ADD THIS INITIALIZATION CODE
-    const appCheck = firebase.appCheck();
-    appCheck.activate(
-      'PASTE_YOUR_RECAPTCHA_SITE_KEY_HERE', // Use the public reCAPTCHA v3 site key
-      true);
-      
     const analytics = firebase.analytics();
     const db        = firebase.firestore();
 
@@ -240,26 +232,9 @@
       if (e.target.matches('.delete-note-btn')) {
         e.preventDefault();
         const docSnap = await db.collection('notes').doc(code).get();
-    _tempDel[code] = docSnap.exists ? docSnap.data().text : '';
+        // Fixed typo here
+        tempDel[code] = docSnap.exists ? docSnap.data().text : '';
         await db.collection('notes').doc(code).delete();
         document.getElementById(`note-display-${i}`).textContent = '';
         e.target.nextElementSibling.style.display = 'inline';
       }
-
-      if (e.target.matches('.undo-note-btn')) {
-        e.preventDefault();
-        await db.collection('notes').doc(code).set({
-          text: tempDel[code],
-          updated: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        document.getElementById(`note-display-${i}`).textContent = tempDel[code];
-        e.target.style.display = 'none';
-        delete tempDel[code];
-      }
-    });
-
-    // initialize
-    loadStations();
-  </script>
-</body>
-</html>
