@@ -2,379 +2,167 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Pump Stations Admin</title>
+  <title>Admin - Sewer District 3 Pump Station Map</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    body { margin:0; padding:0; font-family:sans-serif; }
-    h1 { margin:10px; }
-    #map { height:56vh; }
-    #stationsTable { height:44vh; overflow-y:auto; }
-    #stationsTable table { width:100%; border-collapse:collapse; }
-    th, td { border:1px solid #ccc; padding:6px; }
-    th { background:#f5f5f5; }
-    tr.selected, tr:hover { background:#d0eaff !important; }
-    input[readonly] { background: #f9f9f9; border:none; }
-    button { margin:0 4px; }
-    #adminSearchWrap { margin:8px 10px 2px 10px; display:flex; gap:8px; align-items:center;}
-    #adminSearch { flex:1; padding:4px 8px; font-size:15px; border:1px solid #bbb; border-radius:4px; }
-    .suggestions { 
-      position:absolute; background:#fff; border:1px solid #bbb; z-index:1100; 
-      max-height:180px; overflow-y:auto; width:350px; left:10px; top:44px;
+    body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; }
+    h1 { color: #333; }
+    #stationList { list-style-type: none; padding: 0; }
+    #stationList li {
+      background: #fff;
+      margin-bottom: 10px;
+      padding: 15px;
+      border-radius: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    .suggestion-item { padding:7px 12px; cursor:pointer; }
-    .suggestion-item:hover { background:#e9f4ff; }
-    #addStationFromSearch { padding:5px 9px; font-size:13px; margin:6px 0 0 0; border-radius:5px; border:1px solid #06c; color:#06c; background:#f5faff; }
-    /* Login box */
-    #loginBox {
-      position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:3000;
-      background:rgba(255,255,255,0.96);display:flex;align-items:center;justify-content:center;
+    .station-actions button {
+      margin-left: 10px;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
     }
-    #loginInner {
-      background:#fff; border-radius:9px; box-shadow:0 2px 12px #9993; padding:30px 30px 24px 30px; min-width:290px;
-      display:flex; flex-direction:column; align-items:center; gap:16px;
+    .edit-btn { background-color: #ffc107; }
+    .delete-btn { background-color: #dc3545; color: white; }
+    #addStationForm {
+      background: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      margin-top: 20px;
     }
-    #loginInner input { font-size:15px; padding:7px 11px; border-radius:5px; border:1px solid #aaa; width:180px; }
-    #loginInner button { padding:6px 22px; font-size:15px; background:#0066cc; color:#fff; border:none; border-radius:5px; cursor:pointer;}
-    #loginInner h2 { margin-bottom:8px; }
+    #addStationForm input {
+      width: calc(100% - 22px);
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    #addStationForm button {
+      background: #28a745;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <div id="loginBox" style="display:none;">
-    <form id="loginInner" onsubmit="return false;">
-      <h2>Admin Login</h2>
-      <input id="email" type="email" placeholder="Email" required autocomplete="username" autofocus>
-      <input id="password" type="password" placeholder="Password" required autocomplete="current-password">
-      <button id="loginBtn" type="submit">Sign In</button>
-      <div id="loginError" style="color:#d00;min-height:22px"></div>
-    </form>
+
+  <h1>Pump Station Management</h1>
+  <a href="index.html">Back to Map</a>
+
+  <div id="addStationForm">
+    <h2>Add New Station</h2>
+    <input type="text" id="stationCode" placeholder="Station Code (e.g., A1)">
+    <input type="text" id="stationAddress" placeholder="Address">
+    <input type="text" id="stationLat" placeholder="Latitude">
+    <input type="text" id="stationLon" placeholder="Longitude">
+    <button id="addBtn">Add Station</button>
   </div>
 
-  <h1>Pump Stations Admin</h1>
-  <div id="adminSearchWrap">
-    <input id="adminSearch" type="text" placeholder="Search address…" autocomplete="off">
-    <div id="suggestions" class="suggestions" style="display:none"></div>
-  </div>
-  <div id="map"></div>
-  <div id="stationsTable">
-    <table>
-      <thead>
-        <tr>
-          <th>Code</th>
-          <th>Address</th>
-          <th>Lat</th>
-          <th>Lon</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
+  <h2>Existing Stations</h2>
+  <ul id="stationList"></ul>
 
-  <!-- Libraries -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+
   <script>
-  // --- FIREBASE INIT ---
-  firebase.initializeApp({
-    apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
-    authDomain:        "sd3ps-map.firebaseapp.com",
-    projectId:         "sd3ps-map",
-    storageBucket:     "sd3ps-map.appspot.com",
-    messagingSenderId: "14976888367",
-    appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
-    measurementId:     "G-HHX1X8KFSF"
-  });
-  const db = firebase.firestore(), auth = firebase.auth();
-
-  // --- UI ELEMENTS ---
-  const loginBox = document.getElementById('loginBox');
-  const emailInput = document.getElementById('email');
-  const passwordInput = document.getElementById('password');
-  const loginBtn = document.getElementById('loginBtn');
-  const loginError = document.getElementById('loginError');
-  const adminSearch = document.getElementById('adminSearch');
-  const suggestionsDiv = document.getElementById('suggestions');
-  const tbody = document.querySelector('#stationsTable tbody');
-  let map, markers = [], docs = [], tempDel = {}, selectedRow = null, pinDragIdx = null;
-
-  // --- LOGIN HANDLER ---
-  async function handleLogin(e) {
-    e.preventDefault();
-    loginError.textContent = '';
-    loginBtn.disabled = true;
-    try {
-      await auth.signInWithEmailAndPassword(emailInput.value, passwordInput.value);
-      loginBox.style.display = 'none';
-      setTimeout(initializeApp, 50);
-    } catch (err) {
-      loginError.textContent = 'Login failed: ' + (err.message || 'Check credentials.');
-      loginBtn.disabled = false;
-    }
-  }
-  document.getElementById('loginInner').onsubmit = handleLogin;
-
-  // --- AUTH GUARD ---
-  auth.onAuthStateChanged(user=>{
-    if (!user) {
-      loginBox.style.display = 'flex';
-      emailInput.value = '';
-      passwordInput.value = '';
-      loginBtn.disabled = false;
-    } else {
-      loginBox.style.display = 'none';
-      setTimeout(initializeApp, 50);
-    }
-  });
-
-  // --- SEARCH: SUGGESTIONS & ADD TO MAP ---
-  let suggestionTimeout;
-  adminSearch.addEventListener('input', async () => {
-    clearTimeout(suggestionTimeout);
-    const query = adminSearch.value.trim();
-    if (!query) return suggestionsDiv.style.display = 'none';
-    suggestionTimeout = setTimeout(async () => {
-      // Use Nominatim for suggestions
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=6`;
-      const resp = await fetch(url);
-      const results = await resp.json();
-      suggestionsDiv.innerHTML = '';
-      if (results.length === 0) {
-        suggestionsDiv.style.display = 'none';
-        return;
-      }
-      // Show suggestions
-      for (const r of results) {
-        const item = document.createElement('div');
-        item.className = 'suggestion-item';
-        item.textContent = r.display_name;
-        item.onclick = () => {
-          // Set search box, center map, show add button
-          adminSearch.value = r.display_name;
-          map.setView([r.lat, r.lon], 17);
-          suggestionsDiv.style.display = 'none';
-          showAddStationBtn(r);
-        };
-        suggestionsDiv.appendChild(item);
-      }
-      suggestionsDiv.style.display = 'block';
-    }, 260);
-  });
-
-  // --- ADD STATION FROM SEARCH ---
-  function showAddStationBtn(result) {
-    let btn = document.getElementById('addStationFromSearch');
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.id = 'addStationFromSearch';
-      adminSearch.parentNode.appendChild(btn);
-    }
-    btn.textContent = `Add to map: "${result.display_name.split(",")[0]}"`;
-    btn.onclick = async () => {
-      const codePrompt = prompt("Enter a unique code for this station (e.g. PS#999):");
-      if (!codePrompt) return;
-      const code = codePrompt.trim();
-      const address = result.display_name;
-      const lat = parseFloat(result.lat);
-      const lon = parseFloat(result.lon);
-      // Write to Firestore
-      await db.collection('pumpStations').doc(code).set({ address, lat, lon });
-      btn.remove();
-      alert('Station added!');
-      // Refresh UI
-      tbody.innerHTML = '';
-      markers.forEach(m=>m.remove());
-      markers.length=0; docs.length=0;
-      loadStations();
-      adminSearch.value = '';
-    };
-    btn.style.display = 'inline-block';
-  }
-  adminSearch.addEventListener('focus', ()=>{ suggestionsDiv.style.display='block'; });
-  document.body.addEventListener('click', e=>{
-    if(!e.target.closest('#adminSearchWrap')) { suggestionsDiv.style.display='none'; let b=document.getElementById('addStationFromSearch'); if(b) b.style.display='none'; }
-  });
-
-  // --- MAIN APP INIT ---
-  function initializeApp() {
-    // Only run once map is loaded!
-    if (window.__map_initialized) return;
-    window.__map_initialized = true;
-
-    map = L.map('map').setView([40.730889, -73.284654], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution:'© OpenStreetMap contributors'
-    }).addTo(map);
-
-    loadStations();
-  }
-
-  // --- LOAD ALL STATIONS (table + map) ---
-  async function loadStations() {
-    tbody.innerHTML = '';
-    markers.forEach(m=>m.remove());
-    markers = [];
-    docs = [];
-
-    const snap = await db.collection('pumpStations').get();
-    snap.docs.forEach((doc, idx) => addStation(doc, idx));
-  }
-
-  // --- ADD A ROW + MAP MARKER ---
-  function addStation(doc, idx) {
-    const code = doc.id;
-    let { address, lat, lon } = doc.data();
-    docs[idx] = doc;
-
-    // --- Table Row ---
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input class="code" value="${code}" readonly></td>
-      <td><input class="addr" value="${address}" readonly></td>
-      <td><input class="lat" type="number" step="any" value="${lat}" readonly></td>
-      <td><input class="lon" type="number" step="any" value="${lon}" readonly></td>
-      <td>
-        <button class="edit"  data-idx="${idx}">Edit</button>
-        <button class="save"  data-idx="${idx}" style="display:none;">Save</button>
-        <button class="cancel" data-idx="${idx}" style="display:none;">Cancel</button>
-        <button class="del"   data-idx="${idx}">Delete</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-
-    // Row select/highlight/scroll
-    tr.onclick = e=>{
-      if(e.target.tagName==='BUTTON'||e.target.tagName==='INPUT') return;
-      selectRow(idx, true);
-      markers[idx].fire('click');
-    };
-
-    // --- Map Marker ---
-    const m = L.marker([lat, lon]).addTo(map);
-    markers[idx] = m;
-    m.on('click', async () => {
-      selectRow(idx, true);
-      const ns = await db.collection('notes').doc(code).get();
-      const note = ns.exists ? ns.data().text : '';
-      const popup = `
-        <strong>${code}</strong><br>
-        ${address}<br>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank">Navigate</a>
-        | <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
-        | <a href="#" class="del-note" data-idx="${idx}">Delete Note</a>
-        | <a href="#" class="undo-note" data-idx="${idx}" style="display:none">Undo</a>
-        | <a href="#" class="adjust-pin" data-idx="${idx}">Adjust Pin</a>
-        <div id="note-display-${idx}" style="font-style:italic;color:#555; margin-top:7px;">
-          ${note}
-        </div>
-      `;
-      map.once('moveend', ()=> m.bindPopup(popup).openPopup());
-      map.setView([lat, lon], 17, { animate:true, duration:0.8 });
+    // Firebase init
+    firebase.initializeApp({
+      apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
+      authDomain:        "sd3ps-map.firebaseapp.com",
+      projectId:         "sd3ps-map",
+      storageBucket:     "sd3ps-map.appspot.com",
+      messagingSenderId: "14976888367",
+      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
+      measurementId:     "G-HHX1X8KFSF"
     });
-  }
+    const db = firebase.firestore();
 
-  // --- TABLE EVENTS (edit, save, cancel, delete) ---
-  tbody.addEventListener('click', async e => {
-    const tr = e.target.closest('tr');
-    if (!tr) return;
-    const idx = Array.from(tbody.children).indexOf(tr);
-    const code = tr.querySelector('.code').value;
+    // DOM refs
+    const stationList = document.getElementById('stationList');
+    const addBtn = document.getElementById('addBtn');
+    const codeInput = document.getElementById('stationCode');
+    const addressInput = document.getElementById('stationAddress');
+    const latInput = document.getElementById('stationLat');
+    const lonInput = document.getElementById('stationLon');
 
-    if (e.target.matches('.edit')) {
-      ['addr','lat','lon'].forEach(cls=>{
-        tr.querySelector('.'+cls).readOnly = false;
+    // Load and display stations
+    async function getStations() {
+      stationList.innerHTML = '';
+      const snapshot = await db.collection('pumpStations').get();
+      snapshot.forEach(doc => {
+        const station = doc.data();
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span>
+            <strong>${doc.id}</strong> - ${station.address} (${station.lat}, ${station.lon})
+          </span>
+          <span class="station-actions">
+            <button class="edit-btn" data-id="${doc.id}">Edit</button>
+            <button class="delete-btn" data-id="${doc.id}">Delete</button>
+          </span>
+        `;
+        stationList.appendChild(li);
       });
-      tr.querySelector('.edit').style.display='none';
-      tr.querySelector('.save').style.display='';
-      tr.querySelector('.cancel').style.display='';
     }
-    if (e.target.matches('.cancel')) {
-      loadStations(); // reload to cancel changes
-    }
-    if (e.target.matches('.save')) {
-      const newAddress = tr.querySelector('.addr').value.trim();
-      const newLat = parseFloat(tr.querySelector('.lat').value);
-      const newLon = parseFloat(tr.querySelector('.lon').value);
-      await db.collection('pumpStations').doc(code).update({
-        address: newAddress, lat: newLat, lon: newLon
-      });
-      alert('Saved!');
-      loadStations();
-    }
-    if (e.target.matches('.del')) {
-      if (!confirm(`Delete ${code}?`)) return;
-      await db.collection('pumpStations').doc(code).delete();
-      alert('Deleted!');
-      loadStations();
-    }
-  });
 
-  // --- POPUP NOTE & ADJUST PIN HANDLERS ---
-  document.body.addEventListener('click', async e => {
-    if (!e.target.dataset.idx) return;
-    const idx = +e.target.dataset.idx;
-    if (isNaN(idx)) return;
-    const code = docs[idx].id;
+    // Add a new station
+    addBtn.addEventListener('click', async () => {
+      const code = codeInput.value.trim();
+      const address = addressInput.value.trim();
+      const lat = parseFloat(latInput.value);
+      const lon = parseFloat(lonInput.value);
 
-    // Add/Edit note
-    if (e.target.matches('.note-btn')) {
-      e.preventDefault();
-      const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
-      const txt = prompt(`Note for ${code}:`,cur);
-      if (txt!==null){
-        await db.collection('notes').doc(code)
-          .set({ text:txt, updated:firebase.firestore.FieldValue.serverTimestamp() });
-        document.getElementById(`note-display-${idx}`).textContent=txt;
-      }
-    }
-    // Delete note
-    if (e.target.matches('.del-note')) {
-      e.preventDefault();
-      const snapN = await db.collection('notes').doc(code).get();
-      tempDel[code] = snapN.exists? snapN.data().text:'';
-      await db.collection('notes').doc(code).delete();
-      document.getElementById(`note-display-${idx}`).textContent='';
-      e.target.nextElementSibling.style.display='inline';
-    }
-    // Undo note
-    if (e.target.matches('.undo-note')) {
-      e.preventDefault();
-      await db.collection('notes').doc(code)
-        .set({ text:tempDel[code], updated:firebase.firestore.FieldValue.serverTimestamp() });
-      document.getElementById(`note-display-${idx}`).textContent=tempDel[code];
-      e.target.style.display='none';
-      delete tempDel[code];
-    }
-    // Adjust Pin
-    if (e.target.matches('.adjust-pin')) {
-      e.preventDefault();
-      const m = markers[idx];
-      if (!m.dragging.enabled()){
-        m.dragging.enable();
-        e.target.textContent = 'Save Pin';
-        e.target.classList.add('saving-pin');
+      if (code && address && !isNaN(lat) && !isNaN(lon)) {
+        await db.collection('pumpStations').doc(code).set({ address, lat, lon });
+        codeInput.value = '';
+        addressInput.value = '';
+        latInput.value = '';
+        lonInput.value = '';
+        getStations();
       } else {
-        m.dragging.disable();
-        const {lat,lng} = m.getLatLng();
-        await db.collection('pumpStations').doc(code)
-          .update({ lat, lon:lng });
-        alert('Pin moved');
-        loadStations();
+        alert('Please fill out all fields correctly.');
       }
-    }
-  });
-
-  // --- SELECTION, HIGHLIGHTING & SCROLL ---
-  function selectRow(idx, smooth){
-    Array.from(tbody.children).forEach((tr,i)=>{
-      if(i===idx) { 
-        tr.classList.add('selected'); 
-        if (smooth) tr.scrollIntoView({behavior:'smooth',block:'nearest'});
-      }
-      else tr.classList.remove('selected');
     });
-    selectedRow =
+
+    // Handle edit and delete buttons
+    stationList.addEventListener('click', async (e) => {
+      const target = e.target;
+      const id = target.dataset.id;
+
+      if (target.classList.contains('delete-btn')) {
+        if (confirm(`Are you sure you want to delete station ${id}?`)) {
+          await db.collection('pumpStations').doc(id).delete();
+          getStations();
+        }
+      }
+
+      if (target.classList.contains('edit-btn')) {
+        const doc = await db.collection('pumpStations').doc(id).get();
+        const station = doc.data();
+
+        const newAddress = prompt('Enter new address:', station.address);
+        const newLat = prompt('Enter new latitude:', station.lat);
+        const newLon = prompt('Enter new longitude:', station.lon);
+
+        if (newAddress && newLat && newLon) {
+          await db.collection('pumpStations').doc(id).update({
+            address: newAddress,
+            lat: parseFloat(newLat),
+            lon: parseFloat(newLon)
+          });
+          getStations();
+        }
+      }
+    });
+
+    // Initial load
+    getStations();
+  </script>
+</body>
+</html>
