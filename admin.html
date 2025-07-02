@@ -15,10 +15,10 @@
 
     /* login form */
     #login { padding:20px; }
-    #login input { display:block; margin-bottom:10px; width:200px; }
-    #login button { width: 100px; }
+    #login input { display:block; margin-bottom:10px; width:220px; padding:6px; }
+    #login button { padding:6px 12px; }
 
-    /* hide until auth */
+    /* hide admin UI until logged in */
     #adminUI { display:none; }
 
     /* signed-in bar */
@@ -39,6 +39,7 @@
 </head>
 <body>
 
+  <!-- LOGIN FORM -->
   <div id="login">
     <h2>Admin Sign-In</h2>
     <input id="email" type="email"    placeholder="Email">
@@ -47,6 +48,7 @@
     <div id="loginError" style="color:red;margin-top:10px;"></div>
   </div>
 
+  <!-- ADMIN UI (hidden until login) -->
   <div id="adminUI">
     <div id="signedInBar">
       Signed in as <span id="userEmail"></span>
@@ -73,224 +75,230 @@
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
   <script>
-  window.addEventListener('load', () => {
-    // ─── Firebase init ──────────────────────────────────────────────
-    firebase.initializeApp({
-      apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
-      authDomain:        "sd3ps-map.firebaseapp.com",
-      projectId:         "sd3ps-map",
-      storageBucket:     "sd3ps-map.appspot.com",
-      messagingSenderId: "14976888367",
-      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da"
+  // ─── CONFIGURE FIREBASE ────────────────────────────────────────────
+  firebase.initializeApp({
+    apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
+    authDomain:        "sd3ps-map.firebaseapp.com",
+    projectId:         "sd3ps-map",
+    storageBucket:     "sd3ps-map.appspot.com",
+    messagingSenderId: "14976888367",
+    appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da"
+  });
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+
+  // ─── DOM REFERENCES ────────────────────────────────────────────────
+  const loginDiv   = document.getElementById('login');
+  const adminUI    = document.getElementById('adminUI');
+  const emailIn    = document.getElementById('email');
+  const passIn     = document.getElementById('pass');
+  const btnLogin   = document.getElementById('btnLogin');
+  const btnLogout  = document.getElementById('btnLogout');
+  const loginErr   = document.getElementById('loginError');
+  const userEmail  = document.getElementById('userEmail');
+  const tbody      = document.querySelector('#stationsTable tbody');
+
+  // ─── AUTH LISTENERS ───────────────────────────────────────────────
+  btnLogin.onclick = async () => {
+    loginErr.textContent = '';
+    try {
+      await auth.signInWithEmailAndPassword(emailIn.value, passIn.value);
+    } catch(err) {
+      loginErr.textContent = err.message;
+    }
+  };
+  btnLogout.onclick = () => auth.signOut();
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      loginDiv.style.display = 'none';
+      adminUI.style.display  = 'block';
+      userEmail.textContent  = user.email;
+      initAdmin();
+    } else {
+      loginDiv.style.display = 'block';
+      adminUI.style.display  = 'none';
+      if (window._map) _map.remove();
+      tbody.innerHTML = '';
+    }
+  });
+
+  // ─── ADMIN UI INITIALIZATION ──────────────────────────────────────
+  let _map, markers = [], docs = [], tempDel = {};
+
+  async function initAdmin(){
+    if (_map) return;
+
+    // map + search box
+    _map = L.map('map').setView([40.730889, -73.284654], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap contributors'
+    }).addTo(_map);
+    L.Control.geocoder({ placeholder:'Search address…' })
+      .on('markgeocode', e => _map.setView(e.geocode.center,17))
+      .addTo(_map);
+
+    // fetch & render
+    const snap = await db.collection('pumpStations').get();
+    snap.docs.forEach((doc,i)=> renderStation(doc,i));
+  }
+
+  function renderStation(doc,i){
+    const code = doc.id;
+    let { address, lat, lon } = doc.data();
+    docs[i] = doc;
+
+    // ─ build table row ──────────────────────────────────────────────
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input class="code"  value="${code}" disabled></td>
+      <td><input class="addr"  value="${address}" disabled></td>
+      <td><input class="lat"   type="number" step="any" value="${lat}" disabled></td>
+      <td><input class="lon"   type="number" step="any" value="${lon}" disabled></td>
+      <td>
+        <button class="edit"   data-idx="${i}">Edit</button>
+        <button class="save"   data-idx="${i}">Save</button>
+        <button class="cancel" data-idx="${i}">Cancel</button>
+        <button class="delete" data-idx="${i}">Delete</button>
+        <button class="adjust" data-idx="${i}">Adjust Pin</button>
+      </td>`;
+    tbody.appendChild(tr);
+
+    // hover highlight + click → open marker popup
+    tr.onmouseover = () => tr.classList.add('highlight');
+    tr.onmouseout  = () => tr.classList.remove('highlight');
+    tr.onclick     = () => markers[i].fire('click');
+
+    // ─ build map marker ─────────────────────────────────────────────
+    const m = L.marker([lat,lon]).addTo(_map);
+    markers[i] = m;
+    m.on('click', async ()=>{
+      // fetch note
+      const ns   = await db.collection('notes').doc(code).get();
+      const note = ns.exists ? ns.data().text : '';
+      // popup html
+      const popup = `
+        <strong>${code}</strong><br>
+        ${address}<br>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+           target="_blank">Navigate</a>
+        | <a href="#" class="note-btn"    data-idx="${i}">Note</a>
+        | <a href="#" class="del-note"    data-idx="${i}">Del Note</a>
+        | <a href="#" class="undo-note"   data-idx="${i}" style="display:none">Undo</a>
+        | <a href="#" class="adjust-pin"  data-idx="${i}">Adjust Pin</a>
+        <br><div id="note-display-${i}" style="font-style:italic;color:#555">
+          ${note}
+        </div>`;
+      _map.once('moveend', ()=> m.bindPopup(popup).openPopup());
+      _map.setView([lat,lon],17,{animate:true,duration:0.8});
+      tr.scrollIntoView({behavior:'smooth',block:'nearest'});
     });
-    const auth = firebase.auth();
-    const db   = firebase.firestore();
+  }
 
-    // ─── DOM refs ────────────────────────────────────────────────────
-    const loginDiv   = document.getElementById('login');
-    const adminUI    = document.getElementById('adminUI');
-    const emailIn    = document.getElementById('email');
-    const passIn     = document.getElementById('pass');
-    const btnLogin   = document.getElementById('btnLogin');
-    const btnLogout  = document.getElementById('btnLogout');
-    const loginError = document.getElementById('loginError');
-    const userEmail  = document.getElementById('userEmail');
-    const tbody      = document.querySelector('#stationsTable tbody');
+  // ─── TABLE BUTTON HANDLERS ────────────────────────────────────────
+  tbody.addEventListener('click', async e=>{
+    e.stopPropagation();
+    const idx = +e.target.dataset.idx;
+    const tr  = tbody.children[idx];
+    const code= tr.querySelector('.code').value;
 
-    // ─── Auth handlers ───────────────────────────────────────────────
-    btnLogin.onclick = async () => {
-      loginError.textContent = '';
-      try {
-        await auth.signInWithEmailAndPassword(emailIn.value, passIn.value);
-      } catch(err) {
-        loginError.textContent = err.message;
-      }
-    };
-    btnLogout.onclick = () => auth.signOut();
-
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        // show admin UI
-        loginDiv.style.display  = 'none';
-        adminUI.style.display   = '';
-        userEmail.textContent   = user.email;
-        initAdmin();
+    if (e.target.matches('.edit')){
+      ['addr','lat','lon'].forEach(c=>
+        tr.querySelector('.'+c).disabled = false
+      );
+      tr.querySelector('.edit').style.display   = 'none';
+      tr.querySelector('.save').style.display   = '';
+      tr.querySelector('.cancel').style.display = '';
+    }
+    if (e.target.matches('.cancel')){
+      location.reload();
+    }
+    if (e.target.matches('.save')){
+      const a = tr.querySelector('.addr').value.trim();
+      const lt= +tr.querySelector('.lat').value;
+      const ln= +tr.querySelector('.lon').value;
+      await db.collection('pumpStations').doc(code)
+              .update({ address:a, lat:lt, lon:ln });
+      alert('Saved'); location.reload();
+    }
+    if (e.target.matches('.delete')){
+      if (!confirm(`Delete ${code}?`)) return;
+      await db.collection('pumpStations').doc(code).delete();
+      alert('Deleted'); location.reload();
+    }
+    if (e.target.matches('.adjust')){
+      const btn = e.target, m = markers[idx];
+      if (!m.dragging.enabled()){
+        m.dragging.enable();
+        btn.textContent = 'Save Pin';
       } else {
-        // back to login
-        loginDiv.style.display  = '';
-        adminUI.style.display   = 'none';
-        tbody.innerHTML         = '';
-        if (window._map) window._map.remove();
-      }
-    });
-
-    // ─── Admin logic ────────────────────────────────────────────────
-    let _map, markers = [], docs = [], tempDel = {};
-
-    async function initAdmin(){
-      if (_map) return;  // only once
-
-      // map + geocoder
-      _map = L.map('map').setView([40.730889, -73.284654], 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-        attribution:'© OpenStreetMap contributors'
-      }).addTo(_map);
-      L.Control.geocoder({ placeholder:'Search address…' })
-        .on('markgeocode', e => _map.setView(e.geocode.center, 17))
-        .addTo(_map);
-
-      // fetch & render
-      const snap = await db.collection('pumpStations').get();
-      snap.docs.forEach((doc,i) => renderStation(doc,i));
-    }
-
-    function renderStation(doc,i){
-      const code = doc.id;
-      let { address, lat, lon } = doc.data();
-      docs[i] = doc;
-
-      // build row
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input class="code"  value="${code}" disabled></td>
-        <td><input class="addr"  value="${address}" disabled></td>
-        <td><input class="lat"   type="number" step="any" value="${lat}" disabled></td>
-        <td><input class="lon"   type="number" step="any" value="${lon}" disabled></td>
-        <td>
-          <button class="edit"   data-idx="${i}">Edit</button>
-          <button class="save"   data-idx="${i}">Save</button>
-          <button class="cancel" data-idx="${i}">Cancel</button>
-          <button class="delete" data-idx="${i}">Delete</button>
-          <button class="adjust" data-idx="${i}">Adjust Pin</button>
-        </td>`;
-      tbody.appendChild(tr);
-      tr.onmouseover = () => tr.classList.add('highlight');
-      tr.onmouseout  = () => tr.classList.remove('highlight');
-      tr.onclick     = () => markers[i].fire('click');
-
-      // marker
-      const m = L.marker([lat,lon]).addTo(_map);
-      markers[i] = m;
-      m.on('click', async () => {
-        // popup with notes & adjust‐pin
-        const ns   = await db.collection('notes').doc(code).get();
-        const note = ns.exists ? ns.data().text : '';
-        const popup = `
-          <strong>${code}</strong><br>
-          ${address}<br>
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
-             target="_blank">Navigate</a>
-          | <a href="#" class="note-btn" data-idx="${i}">Note</a>
-          | <a href="#" class="del-note" data-idx="${i}">Del Note</a>
-          | <a href="#" class="undo-note" data-idx="${i}" style="display:none">Undo</a>
-          | <a href="#" class="adjust-pin" data-idx="${i}">Adjust Pin</a>
-          <br><div id="note-display-${i}" style="font-style:italic;color:#555">
-            ${note}
-          </div>`;
-        _map.once('moveend', ()=> m.bindPopup(popup).openPopup());
-        _map.setView([lat,lon],17,{animate:true,duration:0.8});
-        tr.scrollIntoView({behavior:'smooth',block:'nearest'});
-      });
-    }
-
-    // ─── Table actions ──────────────────────────────────────────────
-    tbody.addEventListener('click', async e => {
-      e.stopPropagation();
-      const idx = +e.target.dataset.idx;
-      const tr  = tbody.children[idx];
-      const code= tr.querySelector('.code').value;
-
-      if (e.target.matches('.edit')){
-        ['addr','lat','lon'].forEach(c=> tr.querySelector('.'+c).disabled = false);
-        tr.querySelector('.edit').style.display   = 'none';
-        tr.querySelector('.save').style.display   = '';
-        tr.querySelector('.cancel').style.display = '';
-      }
-      if (e.target.matches('.cancel')){
-        location.reload();
-      }
-      if (e.target.matches('.save')){
-        const a = tr.querySelector('.addr').value.trim();
-        const lt= parseFloat(tr.querySelector('.lat').value);
-        const ln= parseFloat(tr.querySelector('.lon').value);
+        m.dragging.disable();
+        const {lat,lng} = m.getLatLng();
         await db.collection('pumpStations').doc(code)
-          .update({ address:a, lat:lt, lon:ln });
-        alert('Saved'); location.reload();
+                .update({ lat, lon:lng });
+        alert('Pin moved');
+        btn.textContent = 'Adjust Pin';
       }
-      if (e.target.matches('.delete')){
-        if (!confirm(`Delete ${code}?`)) return;
-        await db.collection('pumpStations').doc(code).delete();
-        alert('Deleted'); location.reload();
-      }
-      if (e.target.matches('.adjust')){
-        const btn = e.target, m = markers[idx];
-        if (!m.dragging.enabled()){
-          m.dragging.enable();
-          btn.textContent = 'Save Pin';
-        } else {
-          m.dragging.disable();
-          const {lat,lng} = m.getLatLng();
-          await db.collection('pumpStations').doc(code)
-            .update({ lat, lon:lng });
-          alert('Pin moved');
-          btn.textContent = 'Adjust Pin';
-        }
-      }
-    });
+    }
+  });
 
-    // ─── Popup note & adjust-pin ────────────────────────────────────
-    document.body.addEventListener('click', async e => {
-      const idx = +e.target.dataset.idx;
-      if (isNaN(idx)) return;
-      const code = docs[idx].id;
+  // ─── POPUP NOTE & PIN HANDLERS ────────────────────────────────────
+  document.body.addEventListener('click', async e=>{
+    const idx = +e.target.dataset.idx;
+    if (isNaN(idx)) return;
+    const code = docs[idx].id;
 
-      if (e.target.matches('.note-btn')){
-        e.preventDefault();
-        const cur = (await db.collection('notes').doc(code).get())
-                      .data()?.text||'';
-        const txt = prompt(`Note for ${code}:`,cur);
-        if (txt!==null){
-          await db.collection('notes').doc(code).set({
-            text:txt, updated:firebase.firestore.FieldValue.serverTimestamp()
-          });
-          document.getElementById(`note-display-${idx}`)
-                  .textContent = txt;
-        }
-      }
-      if (e.target.matches('.del-note')){
-        e.preventDefault();
-        const snapN = await db.collection('notes').doc(code).get();
-        tempDel[code] = snapN.exists? snapN.data().text:'';
-        await db.collection('notes').doc(code).delete();
-        document.getElementById(`note-display-${idx}`).textContent='';
-        e.target.nextElementSibling.style.display='inline';
-      }
-      if (e.target.matches('.undo-note')){
-        e.preventDefault();
-        await db.collection('notes').doc(code).set({
-          text:tempDel[code], updated:firebase.firestore.FieldValue.serverTimestamp()
-        });
+    // add/edit note
+    if (e.target.matches('.note-btn')){
+      e.preventDefault();
+      const cur = (await db.collection('notes').doc(code).get())
+                    .data()?.text||'';
+      const txt = prompt(`Note for ${code}:`,cur);
+      if (txt!==null){
+        await db.collection('notes').doc(code)
+                .set({ text:txt,
+                       updated:firebase.firestore.FieldValue.serverTimestamp() });
         document.getElementById(`note-display-${idx}`)
-                .textContent = tempDel[code];
-        e.target.style.display='none';
+                .textContent = txt;
       }
-      if (e.target.matches('.adjust-pin')){
-        const btn = e.target, m = markers[idx];
-        if (!m.dragging.enabled()){
-          m.dragging.enable();
-          btn.textContent = 'Save Pin';
-        } else {
-          m.dragging.disable();
-          const {lat,lng} = m.getLatLng();
-          await db.collection('pumpStations').doc(code)
-            .update({ lat, lon:lng });
-          alert('Pin moved');
-          btn.textContent = 'Adjust Pin';
-        }
+    }
+    // delete note
+    if (e.target.matches('.del-note')){
+      e.preventDefault();
+      const snapN = await db.collection('notes').doc(code).get();
+      tempDel[code] = snapN.exists? snapN.data().text:'';
+      await db.collection('notes').doc(code).delete();
+      document.getElementById(`note-display-${idx}`).textContent='';
+      e.target.nextElementSibling.style.display='inline';
+    }
+    // undo note
+    if (e.target.matches('.undo-note')){
+      e.preventDefault();
+      await db.collection('notes').doc(code)
+              .set({ text:tempDel[code],
+                     updated:firebase.firestore.FieldValue.serverTimestamp() });
+      document.getElementById(`note-display-${idx}`)
+              .textContent = tempDel[code];
+      e.target.style.display='none';
+    }
+    // adjust pin inside popup
+    if (e.target.matches('.adjust-pin')){
+      e.preventDefault();
+      const btn = e.target, m = markers[idx];
+      if (!m.dragging.enabled()){
+        m.dragging.enable();
+        btn.textContent = 'Save Pin';
+      } else {
+        m.dragging.disable();
+        const {lat,lng} = m.getLatLng();
+        await db.collection('pumpStations').doc(code)
+                .update({ lat, lon:lng });
+        alert('Pin moved');
+        btn.textContent = 'Adjust Pin';
       }
-    });
+    }
+  });
 
-  }); // window.onload
   </script>
 </body>
 </html>
