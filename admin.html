@@ -14,21 +14,21 @@
     #loginBox button { width:100%; margin-top:8px; }
     #adminUI { display:none; }
     h1 { margin:10px; }
-    #map { height:55vh; }
-    #stationsTable { height:45vh; overflow-y:auto; }
+    #map { height:54vh; }
+    #stationsTable { height:46vh; overflow-y:auto; }
     #stationsTable table { width:100%; border-collapse:collapse; }
     th, td { border:1px solid #ccc; padding:6px; }
     th { background:#f5f5f5; }
-    tr { cursor:pointer; }
+    tr { cursor:pointer; transition: background 0.13s; }
     tr.highlight, tr:focus, tr:active { background:#d0eaff !important; }
-    input.cell { width:100%; box-sizing:border-box; }
+    tr.editing { background: #fffde5 !important; }
+    input.cell { width:100%; box-sizing:border-box; background:#fff; }
     button { margin:0 4px; }
     button.save, button.cancel { display:none; }
     tr:hover { background:#e6f3ff; }
   </style>
 </head>
 <body>
-
   <!-- LOGIN -->
   <div id="loginContainer">
     <div id="loginBox">
@@ -39,7 +39,6 @@
       <p id="loginError" style="color:red;"></p>
     </div>
   </div>
-
   <!-- ADMIN UI -->
   <div id="adminUI">
     <h1>Pump Stations Admin</h1>
@@ -55,7 +54,6 @@
       </table>
     </div>
   </div>
-
   <!-- SDKs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
@@ -63,9 +61,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
-
   <script>
-    // Firebase config (leave unchanged)
+    // --- CONFIG ---
     firebase.initializeApp({
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -79,6 +76,7 @@
     const db   = firebase.firestore();
     const analytics = firebase.analytics();
 
+    // --- LOGIN LOGIC ---
     const loginContainer = document.getElementById('loginContainer');
     const adminUI        = document.getElementById('adminUI');
     const emailInput     = document.getElementById('email');
@@ -86,11 +84,6 @@
     const loginBtn       = document.getElementById('loginBtn');
     const loginError     = document.getElementById('loginError');
 
-    // --- ONLY for testing: always start signed out
-    // Comment out after your first good login!
-    auth.signOut();
-
-    // Login button
     loginBtn.onclick = async () => {
       loginError.textContent = '';
       try {
@@ -103,7 +96,6 @@
       }
     };
 
-    // Listen for auth state changes
     auth.onAuthStateChanged(async user => {
       if (user) {
         loginContainer.style.display = 'none';
@@ -124,7 +116,7 @@
       }
     });
 
-    // Main Admin logic
+    // --- MAIN ADMIN UI LOGIC ---
     async function initAdmin(){
       const map = L.map('map').setView([40.730889, -73.284654], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
@@ -147,11 +139,12 @@
         docs[i]=doc;
 
         const tr = document.createElement('tr');
+        tr.tabIndex = 0;
         tr.innerHTML=`
-          <td><input class="code" value="${code}" disabled></td>
+          <td><input class="code cell" value="${code}" disabled></td>
           <td><input class="addr cell" value="${address}" disabled></td>
-          <td><input class="lat cell" type="number" step="any" value="${lat}" disabled></td>
-          <td><input class="lon cell" type="number" step="any" value="${lon}" disabled></td>
+          <td><input class="lat  cell" type="number" step="any" value="${lat}" disabled></td>
+          <td><input class="lon  cell" type="number" step="any" value="${lon}" disabled></td>
           <td>
             <button class="edit"   data-idx="${i}">Edit</button>
             <button class="save"   data-idx="${i}">Save</button>
@@ -160,12 +153,13 @@
           </td>`;
         tbody.appendChild(tr);
 
-        // Click row: show popup & highlight row
-        tr.addEventListener('click', ev => {
-          if (ev.target.tagName === "BUTTON" || ev.target.tagName === "INPUT") return;
-          markers[i].fire('click');
+        // Always highlight row on click/field focus, and show popup on click (but not when clicking a button or input)
+        tr.addEventListener('mousedown', ev => {
+          if (ev.target.tagName === "BUTTON") return;
           selectRow(i);
+          markers[i].fire('click');
         });
+        tr.addEventListener('focusin', () => selectRow(i));
 
         // Marker (pin)
         const m = L.marker([lat,lon]).addTo(map);
@@ -216,6 +210,7 @@
           ['addr','lat','lon'].forEach(c=>{
             tr.querySelector(`.${c}`).disabled=false;
           });
+          tr.classList.add('editing');
           tr.querySelector('.edit').style.display='none';
           tr.querySelector('.save').style.display='inline-block';
           tr.querySelector('.cancel').style.display='inline-block';
