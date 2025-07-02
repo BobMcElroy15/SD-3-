@@ -4,37 +4,24 @@
   <meta charset="utf-8">
   <title>Pump Stations Admin</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-
-  <!-- Leaflet & Geocoder CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
-
   <style>
     body { margin:0; padding:0; font-family:sans-serif; }
     #loginContainer {
-      display:flex; height:100vh;
-      align-items:center; justify-content:center;
+      display:flex; height:100vh; align-items:center; justify-content:center;
     }
-    #loginBox {
-      padding:20px; border:1px solid #ccc;
-      border-radius:6px; background:#fafafa;
-    }
-    #loginBox input {
-      display:block; width:220px; margin:8px 0; padding:6px;
-    }
-
+    #loginBox { padding:20px; border:1px solid #ccc; border-radius:6px; background:#fafafa; }
+    #loginBox input { display:block; width:220px; margin:8px 0; padding:6px; }
     #adminUI { display:none; }
     h1 { margin:10px; }
-
     #map { height:60vh; }
-
     #stationsTable { height:40vh; overflow-y:auto; }
     #stationsTable table { width:100%; border-collapse:collapse; }
     th, td { border:1px solid #ccc; padding:6px; }
     th { background:#f5f5f5; }
     tr:hover { background:#fafafa; cursor:pointer; }
     tr.highlight { background:#d0eaff !important; }
-
     input.cell { width:100%; box-sizing:border-box; }
     button { margin:0 4px; }
     button.save, button.cancel { display:none; }
@@ -46,8 +33,8 @@
   <div id="loginContainer">
     <div id="loginBox">
       <h2>Admin Login</h2>
-      <input type="email" id="email" placeholder="Email">
-      <input type="password" id="password" placeholder="Password">
+      <input type="email" id="email" placeholder="Email" autocomplete="username">
+      <input type="password" id="password" placeholder="Password" autocomplete="current-password">
       <button id="loginBtn">Sign In</button>
       <p id="loginError" style="color:red;"></p>
     </div>
@@ -78,7 +65,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
   <script>
-  // ─── Firebase init ────────────────────────────────────────────────
+  // ─── Firebase init ──────────────────────────
   firebase.initializeApp({
     apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
     authDomain:        "sd3ps-map.firebaseapp.com",
@@ -92,7 +79,7 @@
   const db   = firebase.firestore();
   const analytics = firebase.analytics();
 
-  // ─── UI refs ──────────────────────────────────────────────────────
+  // UI refs
   const loginContainer = document.getElementById('loginContainer');
   const adminUI        = document.getElementById('adminUI');
   const emailInput     = document.getElementById('email');
@@ -100,7 +87,10 @@
   const loginBtn       = document.getElementById('loginBtn');
   const loginError     = document.getElementById('loginError');
 
-  // ─── Sign in handler ─────────────────────────────────────────────
+  // Hide admin UI initially
+  adminUI.style.display = "none";
+
+  // Sign in handler
   loginBtn.onclick = async () => {
     loginError.textContent = '';
     try {
@@ -113,15 +103,25 @@
     }
   };
 
-  // ─── After auth, show admin UI ───────────────────────────────────
+  // Debounce "user == null" (prevents blank)
+  let adminInited = false;
   auth.onAuthStateChanged(user => {
-    if (!user) return;
-    loginContainer.style.display = 'none';
-    adminUI.style.display        = '';
-    initAdmin();
+    if (user) {
+      loginContainer.style.display = 'none';
+      adminUI.style.display = '';
+      if (!adminInited) {
+        initAdmin();
+        adminInited = true;
+      }
+    } else {
+      // If signed out, show login and hide admin
+      loginContainer.style.display = '';
+      adminUI.style.display = 'none';
+      adminInited = false;
+    }
   });
 
-  // ─── Main admin logic ─────────────────────────────────────────────
+  // Main admin logic
   async function initAdmin(){
     // map + geocoder
     const map = L.map('map').setView([40.730889, -73.284654], 12);
@@ -157,7 +157,9 @@
       tbody.appendChild(tr);
 
       // click row → open its popup + highlight
-      tr.addEventListener('click', ()=>{
+      tr.addEventListener('click', (ev)=>{
+        // Prevent conflict with button clicks
+        if (ev.target.tagName === "BUTTON" || ev.target.tagName === "INPUT") return;
         markers[i].fire('click');
         document.querySelectorAll('tr')
           .forEach(r=>r.classList.remove('highlight'));
@@ -185,6 +187,12 @@
           </div>`;
         map.once('moveend',()=>m.bindPopup(html).openPopup());
         map.setView([lat,lon],17,{animate:true,duration:0.8});
+        // highlight row on pin click
+        document.querySelectorAll('tr').forEach(r=>r.classList.remove('highlight'));
+        if (tbody.children[i]) {
+          tbody.children[i].classList.add('highlight');
+          tbody.children[i].scrollIntoView({behavior:'smooth',block:'nearest'});
+        }
       });
     }
 
