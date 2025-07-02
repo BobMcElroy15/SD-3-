@@ -9,17 +9,18 @@
   <style>
     body { margin:0; padding:0; font-family:sans-serif; }
     h1 { margin:10px; }
-    #map { height:55vh; }
-    #stationsTable { height:45vh; overflow-y:auto; }
-    #stationsTable table { width:100%; border-collapse:collapse; }
-    th, td { border:1px solid #ccc; padding:6px; }
-    th { background:#f5f5f5; }
-    tr:hover, tr.highlight { background:#d0eaff !important; }
+    #map { height: 45vh; min-height: 200px; border-bottom: 1px solid #ccc; }
+    #stationsTable { height: 50vh; overflow-y: auto; }
+    #stationsTable table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ccc; padding: 6px; }
+    th { background: #f5f5f5; }
+    tr:hover, tr.highlight { background: #d0eaff !important; }
     input[readonly] { background: #f5f5f5; border: none; }
-    button { margin:0 4px; }
+    button { margin: 0 4px; }
     #loginDiv { display: flex; flex-direction: column; gap: 7px; align-items: flex-start; margin: 30px 20px; }
     #logoutBtn { margin: 10px 20px; }
     .actions button { min-width: 60px; }
+    #noStationsMsg { color: #888; text-align: center; padding: 1em 0; }
   </style>
 </head>
 <body>
@@ -49,6 +50,7 @@
         </thead>
         <tbody></tbody>
       </table>
+      <div id="noStationsMsg" style="display:none;">No stations found.</div>
     </div>
   </div>
 
@@ -80,6 +82,7 @@
   const loginMsg  = document.getElementById('loginMsg');
   const loginBtn  = document.getElementById('loginBtn');
   const logoutBtn = document.getElementById('logoutBtn');
+  const noStationsMsg = document.getElementById('noStationsMsg');
 
   loginBtn.onclick = async function() {
     loginMsg.textContent = '';
@@ -115,6 +118,7 @@
       window.map = null;
     }
     document.querySelector('#stationsTable tbody').innerHTML = '';
+    if (noStationsMsg) noStationsMsg.style.display = 'none';
     markers = [];
     docs = [];
   }
@@ -130,7 +134,7 @@
 
     markers = []; docs = [];
     const tbody = document.querySelector('#stationsTable tbody');
-    // --- Add one station row + marker
+
     function addStation(doc, idx) {
       const code = doc.id;
       let { address, lat, lon } = doc.data();
@@ -167,7 +171,6 @@
       const m = L.marker([lat, lon]).addTo(map);
       markers[idx] = m;
       m.on('click', async () => {
-        // Popup content
         const ns = await db.collection('notes').doc(code).get();
         const note = ns.exists ? ns.data().text : '';
         const popup = `
@@ -194,7 +197,16 @@
 
     // --- Load all stations
     db.collection('pumpStations').get().then(snap=>{
-      snap.docs.forEach((doc,i)=> addStation(doc,i));
+      if (!snap.empty) {
+        snap.docs.forEach((doc,i)=> addStation(doc,i));
+        noStationsMsg.style.display = 'none';
+      } else {
+        noStationsMsg.style.display = '';
+      }
+    }).catch(e=>{
+      noStationsMsg.style.display = '';
+      noStationsMsg.textContent = "Error loading stations: " + e.message;
+      console.error(e);
     });
 
     // --- Table Edit/Save/Cancel/Delete
