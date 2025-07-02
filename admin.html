@@ -14,6 +14,8 @@
       --success-color: #28a745;
       --light-gray: #f8f9fa;
       --border-color: #dee2e6;
+      --text-color: #212529;
+      --muted-color: #6c757d;
     }
 
     /* Base & Layout */
@@ -21,120 +23,48 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
       margin: 0; 
       background-color: var(--light-gray);
-      overflow: hidden; /* Prevent body scrolling */
+      overflow: hidden;
     }
 
-    #app-layout {
-      display: flex;
-      height: 100vh;
-    }
-
-    #side-panel {
-      width: 420px;
-      background-color: #ffffff;
-      border-right: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 0 15px rgba(0,0,0,0.1);
-      z-index: 10;
-    }
-    
-    #map-container {
-      flex-grow: 1;
-      position: relative;
-    }
-    
-    #map {
-      height: 100%;
-      width: 100%;
-    }
+    #app-layout { display: flex; height: 100vh; }
+    #side-panel { width: 420px; background-color: #ffffff; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-shadow: 0 0 15px rgba(0,0,0,0.1); z-index: 10; }
+    #map-container { flex-grow: 1; position: relative; }
+    #map { height: 100%; width: 100%; }
 
     /* Header */
-    #panel-header {
-      padding: 1rem;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    #panel-header h1 {
-      font-size: 1.25rem;
-      margin: 0;
-    }
-    #logoutBtn {
-      background: none;
-      border: 1px solid var(--danger-color);
-      color: var(--danger-color);
-      font-weight: 500;
-      border-radius: 5px;
-      padding: 0.4rem 0.8rem;
-      cursor: pointer;
-      transition: background-color 0.2s, color 0.2s;
-    }
-    #logoutBtn:hover {
-      background-color: var(--danger-color);
-      color: white;
-    }
+    #panel-header { padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    #panel-header h1 { font-size: 1.25rem; margin: 0; color: var(--text-color); }
+    #logoutBtn { background: none; border: 1px solid var(--danger-color); color: var(--danger-color); font-weight: 500; border-radius: 5px; padding: 0.4rem 0.8rem; cursor: pointer; transition: background-color 0.2s, color 0.2s; }
+    #logoutBtn:hover { background-color: var(--danger-color); color: white; }
 
     /* Scrollable Content Area */
-    #panel-content {
-      overflow-y: auto;
-      padding: 1rem;
-    }
-
-    /* Add from Search Section */
-    #addFromSearch {
-        display: none; background: var(--light-primary); padding: 15px; border-radius: 8px; margin-bottom: 1rem;
-    }
+    #panel-content { overflow-y: auto; padding: 1rem; }
+    #addFromSearch { display: none; background: var(--light-primary); padding: 15px; border-radius: 8px; margin-bottom: 1rem; }
     #addFromSearch p { margin: 0 0 10px 0; font-weight: 500; }
-    #addFromSearch button {
-        background: var(--success-color); color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 1rem;
-    }
+    #addFromSearch button { background: var(--success-color); color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 1rem; }
 
     /* Station List */
     #stationList { list-style-type: none; padding: 0; margin: 0; }
-    #stationList li {
-      background: #fff; margin-bottom: 0.75rem; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer; transition: box-shadow 0.2s, border-color 0.2s;
-    }
-    #stationList li:hover {
-      border-color: var(--primary-color);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    }
-    #stationList li.selected {
-      border-color: var(--primary-color);
-      background-color: var(--light-primary);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    #stationList .info-line {
-      font-weight: 500;
-      margin-bottom: 0.5rem;
-    }
-    #stationList .coords-line {
-      font-size: 0.85rem;
-      color: #6c757d;
-    }
-    .station-actions {
-      margin-top: 0.75rem;
-      border-top: 1px solid var(--border-color);
-      padding-top: 0.75rem;
-      display: flex;
-      gap: 0.5rem;
-    }
-    .station-actions button {
-      flex-grow: 1; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: 500; color: white;
-    }
-    /* ** CHANGED ** Edit button is now blue */
+    #stationList li { background: #fff; margin-bottom: 0.75rem; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer; transition: box-shadow 0.2s, border-color 0.2s; }
+    #stationList li:hover { border-color: var(--primary-color); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    #stationList li.selected { border-color: var(--primary-color); background-color: var(--light-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    #stationList .info-line { font-weight: 500; margin-bottom: 0.5rem; }
+    #stationList .coords-line { font-size: 0.85rem; color: var(--muted-color); }
+    .station-actions { margin-top: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; display: flex; gap: 0.5rem; }
+    .station-actions button { flex-grow: 1; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: 500; color: white; }
     .edit-info-btn { background-color: var(--primary-color); }
     .delete-btn { background-color: var(--danger-color); }
 
+    /* Note Section */
+    .note-section { background: var(--light-gray); padding: 0.75rem; margin-top: 0.75rem; border-radius: 5px; }
+    .note-text { font-style: italic; color: var(--muted-color); margin: 0 0 10px 0; word-wrap: break-word; }
+    .note-text .no-note { color: #aaa; }
+    .note-actions button { font-size: 0.8rem; padding: 4px 8px; flex-grow: 0; width: auto; background-color: #6c757d; }
+    .note-actions .delete-note-btn { background-color: transparent; color: var(--muted-color); border: 1px solid var(--muted-color); }
+
     /* Auth Screen */
-    #auth-container {
-      display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; background: #f8f9fa;
-    }
-    #auth-form {
-      background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 320px;
-    }
+    #auth-container { display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; background: #f8f9fa; }
+    #auth-form { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 320px; }
   </style>
 </head>
 <body>
@@ -275,9 +205,15 @@
       }
       markers = {};
       const snapshot = await db.collection('pumpStations').orderBy('__name__').get();
-      snapshot.forEach(doc => {
+      
+      for (const doc of snapshot.docs) {
         const station = doc.data();
         const code = doc.id;
+
+        // Fetch the note for this station
+        const noteSnap = await db.collection('notes').doc(code).get();
+        const noteText = noteSnap.exists ? noteSnap.data().text : '<span class="no-note">No note.</span>';
+        
         const marker = L.marker([station.lat, station.lon], { draggable: false }).addTo(map);
         marker.bindPopup(getPopupContent(code, station.address));
         markers[code] = marker;
@@ -289,7 +225,6 @@
                 listItem.classList.add('selected');
                 listItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
-            // ** CHANGED ** Zoom in closer when a pin is clicked on the map
             map.flyTo(marker.getLatLng(), 18);
         });
 
@@ -304,11 +239,18 @@
           </div>
           <div class="station-actions">
             <button class="edit-info-btn" data-id="${code}">Edit Info</button>
-            <button class="delete-btn" data-id="${code}">Delete</button>
+            <button class="delete-btn" data-id="${code}">Delete Station</button>
+          </div>
+          <div class="note-section">
+            <p class="note-text">${noteText}</p>
+            <div class="note-actions">
+                <button class="edit-note-btn" data-id="${code}">Edit Note</button>
+                <button class="delete-note-btn" data-id="${code}">Delete Note</button>
+            </div>
           </div>
         `;
         stationList.appendChild(li);
-      });
+      }
     }
 
     addSearchedStationBtn.addEventListener('click', async () => {
@@ -359,13 +301,14 @@
       if (!li) return;
       const id = li.dataset.id;
       
-      document.querySelectorAll('#stationList li').forEach(item => item.classList.remove('selected'));
-      li.classList.add('selected');
-      const marker = markers[id];
-      if (marker) {
-        // ** CHANGED ** Zoom in closer when a list item is clicked
-        map.flyTo(marker.getLatLng(), 18);
-        marker.openPopup();
+      if (!e.target.closest('.station-actions') && !e.target.closest('.note-section')) {
+        document.querySelectorAll('#stationList li').forEach(item => item.classList.remove('selected'));
+        li.classList.add('selected');
+        const marker = markers[id];
+        if (marker) {
+          map.flyTo(marker.getLatLng(), 18);
+          marker.openPopup();
+        }
       }
 
       if (e.target.matches('.edit-info-btn')) {
@@ -377,12 +320,35 @@
           await getStations();
         }
       }
-
+      
       if (e.target.matches('.delete-btn')) {
-        if (confirm(`Are you sure you want to delete station ${id}?`)) {
+        if (confirm(`Are you sure you want to delete station ${id} and its note?`)) {
           await db.collection('pumpStations').doc(id).delete();
+          await db.collection('notes').doc(id).delete();
           await getStations();
         }
+      }
+      
+      if (e.target.matches('.edit-note-btn')) {
+        const noteDoc = await db.collection('notes').doc(id).get();
+        const currentNote = noteDoc.exists ? noteDoc.data().text : "";
+        const newNote = prompt("Enter note:", currentNote);
+        if (newNote !== null) { // Allow saving an empty note
+            await db.collection('notes').doc(id).set({ 
+                text: newNote, 
+                updated: firebase.firestore.FieldValue.serverTimestamp() 
+            });
+            alert('Note updated!');
+            await getStations();
+        }
+      }
+      
+      if (e.target.matches('.delete-note-btn')) {
+          if (confirm('Are you sure you want to delete this note?')) {
+              await db.collection('notes').doc(id).delete();
+              alert('Note deleted!');
+              await getStations();
+          }
       }
     });
   </script>
