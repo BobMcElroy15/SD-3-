@@ -13,7 +13,7 @@
     #loginBox input { width:230px; margin:8px 0; padding:8px; }
     #loginBox button { width:100%; margin-top:12px; padding:7px; }
     #loginBox h2 { margin-top:0; }
-    #loginError { color: red; }
+    #loginError, #fatalError { color: red; margin-top:8px; }
     #adminUI { display:none; }
     h1 { margin:10px 10px 4px 10px; }
     #map { height:52vh; min-height:300px; }
@@ -39,6 +39,7 @@
       <input type="password" id="password" placeholder="Password" autocomplete="current-password">
       <button id="loginBtn">Sign In</button>
       <div id="loginError"></div>
+      <div id="fatalError"></div>
     </div>
   </div>
   <!-- ADMIN UI -->
@@ -64,6 +65,14 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
   <script>
+    // BASIC ERROR BUBBLE, handles all async errors after load
+    window.addEventListener('error', function(e) {
+      const errBox = document.getElementById('fatalError');
+      if (errBox) errBox.textContent = 'JS Error: ' + e.message;
+      document.getElementById('loginContainer').style.display = '';
+      document.getElementById('adminUI').style.display = 'none';
+    });
+
     // --- CONFIG ---
     firebase.initializeApp({
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
@@ -95,6 +104,7 @@
       }
     };
 
+    // Make sure UI does NOT flicker out!
     auth.onAuthStateChanged(async user => {
       if (user) {
         loginContainer.style.display = 'none';
@@ -102,7 +112,9 @@
         try {
           await loadAdminUI();
         } catch (e) {
-          adminUI.innerHTML = "<div style='color:red'>Failed to load admin. " + e + "</div>";
+          document.getElementById('fatalError').textContent = "Failed to load admin: " + e;
+          loginContainer.style.display = '';
+          adminUI.style.display = 'none';
         }
       } else {
         loginContainer.style.display = '';
@@ -118,7 +130,7 @@
         attribution:'© OpenStreetMap contributors'
       }).addTo(map);
 
-      // Geocoder search
+      // Geocoder search (with suggestions)
       L.Control.geocoder({ placeholder:'Search address…' })
         .on('markgeocode', e=>map.setView(e.geocode.center,17))
         .addTo(map);
@@ -287,7 +299,7 @@
         }
       });
 
-      // Finally, render the first time!
+      // Render!
       await renderAllStations();
     }
   </script>
