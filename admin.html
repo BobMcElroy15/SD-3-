@@ -19,6 +19,8 @@
       align-items: center;
       height: 100vh;
       text-align: center;
+      position: relative;
+      z-index: 9999;
     }
     #auth-form {
       background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 320px;
@@ -43,7 +45,6 @@
         background-color: #dc3545; color: white; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer;
     }
 
-    /* Add from Search Section */
     #addFromSearch {
         display: none; background: #e7f3ff; padding: 15px; border-radius: 5px; margin-top: 20px; border-left: 5px solid #0066cc;
     }
@@ -62,7 +63,8 @@
     .station-actions button {
       margin-left: 10px; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer;
     }
-    .save-btn { background-color: #28a745; color: white; }
+    .save-location-btn { background-color: #28a745; color: white; }
+    .edit-info-btn { background-color: #ffc107; }
     .delete-btn { background-color: #dc3545; color: white; }
   </style>
 </head>
@@ -104,7 +106,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <script>
-    // Firebase Config
+    // Firebase Config & Init
     const firebaseConfig = {
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -113,8 +115,6 @@
       messagingSenderId: "14976888367",
       appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da"
     };
-    
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
@@ -130,7 +130,7 @@
     
     let map;
     let markers = {};
-    let lastSearchResult = null; // Store the last searched location
+    let lastSearchResult = null;
 
     // --- Authentication Logic (Unchanged) ---
     const authForm = document.getElementById('auth-form');
@@ -141,7 +141,6 @@
     const switchFormLink = document.getElementById('switch-form');
     const authError = document.getElementById('auth-error');
     let isSignUp = false;
-
     switchFormLink.addEventListener('click', () => {
         isSignUp = !isSignUp;
         formTitle.textContent = isSignUp ? 'Create Account' : 'Admin Sign In';
@@ -149,7 +148,6 @@
         switchFormLink.textContent = isSignUp ? 'Have an account? Sign In' : 'Need an account? Sign Up';
         authError.textContent = '';
     });
-
     authBtn.addEventListener('click', () => {
         const email = emailInput.value;
         const password = passwordInput.value;
@@ -157,9 +155,7 @@
         const authAction = isSignUp ? auth.createUserWithEmailAndPassword(email, password) : auth.signInWithEmailAndPassword(email, password);
         authAction.catch(error => { authError.textContent = error.message; });
     });
-
     logoutBtn.addEventListener('click', () => auth.signOut());
-
     auth.onAuthStateChanged(user => {
       if (user) {
         authContainer.style.display = 'none';
@@ -180,7 +176,6 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
-
         L.Control.geocoder({
             defaultMarkGeocode: true,
             placeholder: 'Search for address...',
@@ -201,17 +196,14 @@
       stationList.innerHTML = '';
       Object.values(markers).forEach(marker => map.removeLayer(marker));
       markers = {};
-
       const snapshot = await db.collection('pumpStations').orderBy('__name__').get();
       snapshot.forEach(doc => {
         const station = doc.data();
         const code = doc.id;
-        
         const marker = L.marker([station.lat, station.lon], { draggable: true }).addTo(map);
         marker.bindPopup(`<strong>${code}</strong><br/>${station.address}`);
         markers[code] = marker;
 
-        // **NEW**: Click a pin to highlight the list item
         marker.on('click', function() {
             document.querySelectorAll('#stationList li').forEach(item => item.classList.remove('selected'));
             const listItem = document.querySelector(`#stationList li[data-id="${code}"]`);
@@ -221,10 +213,9 @@
             }
         });
 
-        // **RESTORED**: Drag a pin to adjust its location
         marker.on('dragend', function(event) {
           const position = event.target.getLatLng();
-          const saveButton = document.querySelector(`button.save-btn[data-id="${code}"]`);
+          const saveButton = document.querySelector(`.save-location-btn[data-id="${code}"]`);
           if (saveButton) {
             saveButton.style.display = 'inline-block';
             document.getElementById(`lat-span-${code}`).textContent = position.lat.toFixed(6);
@@ -236,11 +227,12 @@
         li.dataset.id = code;
         li.innerHTML = `
           <span>
-            <strong>${code}</strong> - ${station.address} 
+            <strong>${code}</strong> - <span class="address-text">${station.address}</span>
             (<span id="lat-span-${code}">${station.lat.toFixed(4)}</span>, <span id="lon-span-${code}">${station.lon.toFixed(4)}</span>)
           </span>
           <span class="station-actions">
-            <button class="save-btn" data-id="${code}" style="display:none;">Save Coords</button>
+            <button class="save-location-btn" data-id="${code}" style="display:none;">Save Location</button>
+            <button class="edit-info-btn" data-id="${code}">Edit Info</button>
             <button class="delete-btn" data-id="${code}">Delete</button>
           </span>
         `;
@@ -248,10 +240,8 @@
       });
     }
 
-    // **NEW**: Add station from the search result
     addSearchedStationBtn.addEventListener('click', async () => {
         if (!lastSearchResult) return;
-
         const code = prompt("Please enter the unique code for this new station:", "S-");
         if (code) {
             await db.collection('pumpStations').doc(code.trim().toUpperCase()).set(lastSearchResult);
@@ -261,14 +251,11 @@
         }
     });
 
-    // Handle clicks on the station list (Select, Save, Delete)
     stationList.addEventListener('click', async (e) => {
       const li = e.target.closest('li');
       if (!li) return;
-
       const id = li.dataset.id;
       
-      // Highlight list item and fly to marker
       document.querySelectorAll('#stationList li').forEach(item => item.classList.remove('selected'));
       li.classList.add('selected');
       const marker = markers[id];
@@ -277,20 +264,32 @@
         marker.openPopup();
       }
 
-      // Handle button clicks within the list item
-      if (e.target.classList.contains('delete-btn')) {
-        if (confirm(`Are you sure you want to delete station ${id}?`)) {
-          await db.collection('pumpStations').doc(id).delete();
-          getStations();
+      // Handle "Edit Info" button
+      if (e.target.matches('.edit-info-btn')) {
+        const currentAddress = li.querySelector('.address-text').textContent;
+        const newAddress = prompt("Enter new address:", currentAddress);
+        if (newAddress && newAddress !== currentAddress) {
+          await db.collection('pumpStations').doc(id).update({ address: newAddress });
+          li.querySelector('.address-text').textContent = newAddress; // Update UI immediately
+          alert('Address updated!');
         }
       }
 
-      if (e.target.classList.contains('save-btn')) {
+      // Handle "Save Location" button
+      if (e.target.matches('.save-location-btn')) {
         const newLat = parseFloat(document.getElementById(`lat-span-${id}`).textContent);
         const newLon = parseFloat(document.getElementById(`lon-span-${id}`).textContent);
         await db.collection('pumpStations').doc(id).update({ lat: newLat, lon: newLon });
-        e.target.style.display = 'none';
+        e.target.style.display = 'none'; // Hide button after saving
         alert(`Station ${id} location updated!`);
+      }
+
+      // Handle "Delete" button
+      if (e.target.matches('.delete-btn')) {
+        if (confirm(`Are you sure you want to delete station ${id}?`)) {
+          await db.collection('pumpStations').doc(id).delete();
+          getStations(); // Refresh everything
+        }
       }
     });
   </script>
