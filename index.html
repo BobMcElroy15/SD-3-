@@ -113,7 +113,7 @@
       measurementId:     "G-HHX1X8KFSF"
     });
 
-    // ** 2. ADD THIS INITIALIZATION CODE **
+    // ADD THIS INITIALIZATION CODE
     const appCheck = firebase.appCheck();
     appCheck.activate(
       'PASTE_YOUR_RECAPTCHA_SITE_KEY_HERE', // Use the public reCAPTCHA v3 site key
@@ -240,7 +240,7 @@
       if (e.target.matches('.delete-note-btn')) {
         e.preventDefault();
         const docSnap = await db.collection('notes').doc(code).get();
-        tempDel[code] = docSnap.exists ? docSnap.data().text : '';
+    _tempDel[code] = docSnap.exists ? docSnap.data().text : '';
         await db.collection('notes').doc(code).delete();
         document.getElementById(`note-display-${i}`).textContent = '';
         e.target.nextElementSibling.style.display = 'inline';
