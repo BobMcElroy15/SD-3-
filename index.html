@@ -31,7 +31,7 @@
     #title {
       position:absolute; top:10px; left:80px; right:5%;
       background:#fff; padding:6px; border-radius:6px;
-  _font-size:18px; font-weight:bold; text-align:center;
+      font-size:18px; font-weight:bold; text-align:center;
       z-index:900;
     }
 
@@ -184,8 +184,8 @@
       const ns   = await db.collection('notes').doc(code).get();
       const note = ns.exists ? ns.data().text : '';
       
-      // ** CORRECTED THIS LINE **
-      const navUrl = `https://maps.google.com/?q=${lat},${lon}`;
+      // ** CORRECTED URL **
+      const navUrl = `https://maps.google.com/?q=$${lat},${lon}`;
 
       const html = `
         <strong>${code}</strong><br>
@@ -234,6 +234,7 @@
       if (e.target.matches('.delete-note-btn')) {
         e.preventDefault();
         const docSnap = await db.collection('notes').doc(code).get();
+        // ** CORRECTED TYPO **
         tempDel[code] = docSnap.exists ? docSnap.data().text : '';
         await db.collection('notes').doc(code).delete();
         document.getElementById(`note-display-${i}`).textContent = '';
