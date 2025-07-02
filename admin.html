@@ -22,8 +22,6 @@
     tr.highlight { background:#add8e6 !important; }
     input { width:100%; box-sizing:border-box; background:#f9f9f9; border:1px solid #ccc; padding:4px; }
     button { margin:0 4px; }
-    /* hide Save/Cancel until Edit pressed */
-    button.save, button.cancel { display:none; }
   </style>
 </head>
 <body>
@@ -97,8 +95,8 @@
         <td><input class="lon"   type="number" step="any" value="${lon}" disabled></td>
         <td>
           <button class="edit"  data-idx="${idx}">Edit</button>
-          <button class="save"  data-idx="${idx}">Save</button>
-          <button class="cancel"data-idx="${idx}">Cancel</button>
+          <button class="save"  data-idx="${idx}" style="display:none">Save</button>
+          <button class="cancel"data-idx="${idx}" style="display:none">Cancel</button>
           <button class="del"   data-idx="${idx}">Delete</button>
         </td>`;
       tbody.appendChild(tr);
@@ -110,27 +108,24 @@
       const m = L.marker([lat, lon]).addTo(map);
       markers[idx] = m;
       m.on('click', async () => {
-        // when marker clicked, highlight row
+        // highlight row
         document.querySelectorAll('tr').forEach(r=>r.classList.remove('highlight'));
         tr.scrollIntoView({behavior:'smooth',block:'nearest'});
         tr.classList.add('highlight');
 
-        // build popup content
+        // build popup
         const ns   = await db.collection('notes').doc(code).get();
         const note = ns.exists ? ns.data().text : '';
         const popup = `
           <strong>${code}</strong><br>
           ${address}<br>
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
-             target="_blank">Navigate</a>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank">Navigate</a>
           | <a href="#" class="note-btn" data-idx="${idx}">Add/Edit Note</a>
           | <a href="#" class="del-note" data-idx="${idx}">Delete Note</a>
           | <a href="#" class="undo-note" data-idx="${idx}" style="display:none">Undo</a>
           | <a href="#" class="adjust-pin" data-idx="${idx}">Adjust Pin</a>
           <br>
-          <div id="note-display-${idx}" style="font-style:italic;color:#555">
-            ${note}
-          </div>`;
+          <div id="note-display-${idx}" style="font-style:italic;color:#555">${note}</div>`;
         map.once('moveend', ()=> m.bindPopup(popup).openPopup());
         map.setView([lat, lon],17,{animate:true,duration:0.8});
       });
@@ -142,11 +137,10 @@
 
     // ─── Table Edit / Save / Cancel / Delete ─────────────────────────
     tbody.addEventListener('click', async e=>{
-      const idx = +e.target.dataset.idx;
-      const tr  = tbody.children[idx];
+      const idx = +e.target.dataset.idx, tr = tbody.children[idx];
       const code= tr.querySelector('.code').value;
 
-      // EDIT: enable inputs + show Save/Cancel
+      // EDIT: unlock fields + show Save/Cancel
       if (e.target.matches('.edit')){
         ['addr','lat','lon'].forEach(c=>{
           const inp = tr.querySelector('.'+c);
@@ -157,23 +151,20 @@
         tr.querySelector('.save').style.display   = '';
         tr.querySelector('.cancel').style.display = '';
       }
-
-      // CANCEL: reload to revert
+      // CANCEL: revert all
       if (e.target.matches('.cancel')){
         location.reload();
       }
-
-      // SAVE: push updates
+      // SAVE: push and reload
       if (e.target.matches('.save')){
         const newAddress = tr.querySelector('.addr').value.trim();
         const newLat     = parseFloat(tr.querySelector('.lat').value);
         const newLon     = parseFloat(tr.querySelector('.lon').value);
         await db.collection('pumpStations').doc(code)
                 .update({ address:newAddress, lat:newLat, lon:newLon });
-        alert('Station saved');
+        alert('Saved');
         location.reload();
       }
-
       // DELETE station
       if (e.target.matches('.del')){
         if (!confirm(`Delete ${code}?`)) return;
