@@ -1,317 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="utf-8">
-  <title>Pump Stations Admin</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
-  <style>
-    body { margin:0; padding:0; font-family:sans-serif; }
-    #loginContainer { height:100vh; display:flex; align-items:center; justify-content:center; }
-    #loginBox { padding:24px 28px; border:1px solid #ccc; border-radius:7px; background:#fafbfc; }
-    #loginBox input { width:230px; margin:8px 0; padding:8px; }
-    #loginBox button { width:100%; margin-top:12px; padding:7px; }
-    #loginBox h2 { margin-top:0; }
-    #loginError, #fatalError { color: red; margin-top:8px; }
-    #adminUI { display:none; }
-    h1 { margin:10px 10px 4px 10px; }
-    #map { height:52vh; min-height:300px; }
-    #stationsTable { height:48vh; overflow-y:auto; }
-    #stationsTable table { width:100%; border-collapse:collapse; }
-    th, td { border:1px solid #ccc; padding:7px 5px; }
-    th { background:#f5f5f5; font-weight:600; }
-    tr { cursor:pointer; transition: background 0.15s; }
-    tr.highlight { background:#d0eaff !important; }
-    tr.editing { background: #fffde5 !important; }
-    input.cell { width:98%; box-sizing:border-box; background:#fff; border-radius:3px; border:1px solid #e0e0e0; padding:5px; }
-    button { margin:0 2px; padding:5px 10px; border-radius:4px; border:1px solid #eee; background:#f5f5f5; cursor:pointer; }
-    button.save, button.cancel { display:none; }
-    tr:hover:not(.editing):not(.highlight) { background:#e6f3ff; }
-  </style>
-</head>
-<body>
-  <!-- LOGIN UI -->
-  <div id="loginContainer">
-    <div id="loginBox">
-      <h2>Admin Login</h2>
-      <input type="email" id="email" placeholder="Email" autocomplete="username">
-      <input type="password" id="password" placeholder="Password" autocomplete="current-password">
-      <button id="loginBtn">Sign In</button>
-      <div id="loginError"></div>
-      <div id="fatalError"></div>
-    </div>
-  </div>
-  <!-- ADMIN UI -->
-  <div id="adminUI">
-    <h1>Pump Stations Admin</h1>
-    <div id="map"></div>
-    <div id="stationsTable">
-      <table>
-        <thead>
-          <tr>
-            <th>Code</th><th>Address</th><th>Lat</th><th>Lon</th><th>Actions</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
-  <!-- Firebase & Map SDKs -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <title>Firebase Auth Test</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
+</head>
+<body>
+  <input id="email" placeholder="Email"><br>
+  <input id="password" type="password" placeholder="Password"><br>
+  <button id="loginBtn">Sign In</button>
+  <div id="msg"></div>
   <script>
-    // Global error catch
-    window.addEventListener('error', function(e) {
-      showError('JS Error: ' + e.message);
-      showLogin();
-    });
-
-    // --- CONFIG ---
+    // Config: use your real values!
     firebase.initializeApp({
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
       projectId:         "sd3ps-map",
-      storageBucket:     "sd3ps-map.appspot.com",
-      messagingSenderId: "14976888367",
-      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
-      measurementId:     "G-HHX1X8KFSF"
     });
     const auth = firebase.auth();
-    const db   = firebase.firestore();
-    const analytics = firebase.analytics();
-
-    const loginContainer = document.getElementById('loginContainer');
-    const adminUI        = document.getElementById('adminUI');
-    const emailInput     = document.getElementById('email');
-    const passInput      = document.getElementById('password');
-    const loginBtn       = document.getElementById('loginBtn');
-    const loginError     = document.getElementById('loginError');
-    const fatalError     = document.getElementById('fatalError');
-
-    function showLogin() {
-      loginContainer.style.display = '';
-      adminUI.style.display = 'none';
-    }
-    function showAdmin() {
-      loginContainer.style.display = 'none';
-      adminUI.style.display = '';
-    }
-    function showError(msg) {
-      fatalError.textContent = msg;
-      loginError.textContent = "";
-      showLogin();
-    }
-
-    loginBtn.onclick = async () => {
-      loginError.textContent = '';
-      fatalError.textContent = '';
+    document.getElementById('loginBtn').onclick = async () => {
       try {
-        await auth.signInWithEmailAndPassword(emailInput.value.trim(), passInput.value);
-      } catch(err) {
-        loginError.textContent = err.message;
+        await auth.signInWithEmailAndPassword(
+          document.getElementById('email').value,
+          document.getElementById('password').value
+        );
+        document.getElementById('msg').textContent = 'Signed in!';
+      } catch(e) {
+        document.getElementById('msg').textContent = e.message;
       }
     };
-
-    // Firebase auth state change logic
-    auth.onAuthStateChanged(async user => {
-      if (user) {
-        showAdmin();
-        try {
-          await loadAdminUI();
-        } catch (e) {
-          showError("Admin load error: " + e);
-        }
-      } else {
-        showLogin();
-      }
-    });
-
-    // --- MAIN ADMIN UI ---
-    async function loadAdminUI() {
-      // This is only called after a successful login!
-      // Map setup
-      const map = L.map('map').setView([40.730889, -73.284654], 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-        attribution:'© OpenStreetMap contributors'
-      }).addTo(map);
-
-      // Geocoder search (with suggestions)
-      L.Control.geocoder({ placeholder:'Search address…' })
-        .on('markgeocode', e=>map.setView(e.geocode.center,17))
-        .addTo(map);
-
-      const tbody = document.querySelector('#stationsTable tbody');
-      tbody.innerHTML = '';
-      let markers = [], docs = [], tempDel = {};
-
-      // Add stations from Firestore
-      async function renderAllStations() {
-        tbody.innerHTML = '';
-        markers.forEach(m=>map.removeLayer(m));
-        markers = [];
-        docs = [];
-        const snap = await db.collection('pumpStations').get();
-        snap.docs.forEach((doc,i) => addStationRow(doc,i));
-      }
-
-      // Add one row + pin
-      function addStationRow(doc, idx) {
-        const code = doc.id;
-        let {address,lat,lon} = doc.data();
-        docs[idx]=doc;
-
-        const tr = document.createElement('tr');
-        tr.tabIndex = 0;
-        tr.innerHTML=`
-          <td><input class="code cell" value="${code}" disabled></td>
-          <td><input class="addr cell" value="${address}" disabled></td>
-          <td><input class="lat cell"  type="number" step="any" value="${lat}" disabled></td>
-          <td><input class="lon cell"  type="number" step="any" value="${lon}" disabled></td>
-          <td>
-            <button class="edit"   data-idx="${idx}">Edit</button>
-            <button class="save"   data-idx="${idx}" style="display:none">Save</button>
-            <button class="cancel" data-idx="${idx}" style="display:none">Cancel</button>
-            <button class="del"    data-idx="${idx}">Delete</button>
-          </td>`;
-        tbody.appendChild(tr);
-
-        // Click row highlights and opens popup, except when editing
-        tr.addEventListener('mousedown', ev => {
-          if (ev.target.tagName === "BUTTON" || ev.target.tagName === "INPUT") return;
-          highlightRow(idx);
-          markers[idx].fire('click');
-        });
-        tr.addEventListener('focusin', () => highlightRow(idx));
-
-        // Marker
-        const m = L.marker([lat,lon]).addTo(map);
-        markers[idx]=m;
-        m.on('click', async()=>{
-          const noteSnap = await db.collection('notes').doc(code).get();
-          const note = noteSnap.exists?noteSnap.data().text:'';
-          const html=`
-            <strong>${code}</strong><br>
-            ${address}<br>
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank">Navigate</a>
-            | <a href="#" class="note-btn"   data-idx="${idx}">Add/Edit Note</a>
-            | <a href="#" class="del-note"   data-idx="${idx}">Delete Note</a>
-            | <a href="#" class="undo-note"  data-idx="${idx}" style="display:none">Undo</a>
-            | <a href="#" class="adjust-pin" data-idx="${idx}">Adjust Pin</a>
-            <br>
-            <div id="note-display-${idx}" style="font-style:italic;color:#555">
-              ${note}
-            </div>`;
-          map.once('moveend',()=>m.bindPopup(html).openPopup());
-          map.setView([lat,lon],17,{animate:true,duration:0.8});
-          highlightRow(idx);
-        });
-      }
-
-      // Highlight and scroll to row
-      function highlightRow(idx){
-        const rows = Array.from(tbody.children);
-        rows.forEach(r => r.classList.remove('highlight'));
-        if (rows[idx]) {
-          rows[idx].classList.add('highlight');
-          rows[idx].scrollIntoView({behavior:'smooth',block:'nearest'});
-        }
-      }
-
-      // --- Table events: Edit/Save/Cancel/Delete ---
-      tbody.onclick = async e=>{
-        const idx = +e.target.dataset.idx;
-        if (isNaN(idx)) return;
-        const tr = tbody.children[idx];
-        const code = tr.querySelector('.code').value;
-
-        if (e.target.matches('.edit')){
-          ['addr','lat','lon'].forEach(c=>{
-            tr.querySelector(`.${c}`).disabled=false;
-          });
-          tr.classList.add('editing');
-          tr.querySelector('.edit').style.display='none';
-          tr.querySelector('.save').style.display='inline-block';
-          tr.querySelector('.cancel').style.display='inline-block';
-        }
-        if (e.target.matches('.cancel')){
-          await renderAllStations();
-        }
-        if (e.target.matches('.save')){
-          const newAddress = tr.querySelector('.addr').value.trim();
-          const newLat     = parseFloat(tr.querySelector('.lat').value);
-          const newLon     = parseFloat(tr.querySelector('.lon').value);
-          await db.collection('pumpStations').doc(code)
-                  .update({address:newAddress,lat:newLat,lon:newLon});
-          alert('Saved');
-          await renderAllStations();
-        }
-        if (e.target.matches('.del')){
-          if (!confirm(`Delete ${code}?`)) return;
-          await db.collection('pumpStations').doc(code).delete();
-          alert('Deleted');
-          await renderAllStations();
-        }
-      };
-
-      // --- Popups: notes & pin adjust ---
-      document.body.addEventListener('click',async e=>{
-        const idx = +e.target.dataset.idx;
-        if (isNaN(idx)) return;
-        const code = docs[idx].id;
-
-        // Note
-        if (e.target.matches('.note-btn')){
-          e.preventDefault();
-          const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
-          const txt = prompt(`Note for ${code}:`,cur);
-          if (txt!==null){
-            await db.collection('notes').doc(code)
-                    .set({text:txt,updated:firebase.firestore.FieldValue.serverTimestamp()});
-            document.getElementById(`note-display-${idx}`).textContent=txt;
-          }
-        }
-        if (e.target.matches('.del-note')){
-          e.preventDefault();
-          const snapN = await db.collection('notes').doc(code).get();
-          tempDel[code]=snapN.exists?snapN.data().text:'';
-          await db.collection('notes').doc(code).delete();
-          document.getElementById(`note-display-${idx}`).textContent='';
-          e.target.nextElementSibling.style.display='inline';
-        }
-        if (e.target.matches('.undo-note')){
-          e.preventDefault();
-          await db.collection('notes').doc(code)
-                  .set({text:tempDel[code],updated:firebase.firestore.FieldValue.serverTimestamp()});
-          document.getElementById(`note-display-${idx}`).textContent=tempDel[code];
-          e.target.style.display='none';
-          delete tempDel[code];
-        }
-        // Adjust Pin
-        if (e.target.matches('.adjust-pin')){
-          e.preventDefault();
-          const m = markers[idx];
-          if (!m.dragging.enabled()){
-            m.dragging.enable();
-            e.target.textContent='Save Pin';
-          } else {
-            m.dragging.disable();
-            const {lat,lng}=m.getLatLng();
-            await db.collection('pumpStations').doc(code)
-                    .update({lat,lon:lng});
-            alert('Pin moved');
-            await renderAllStations();
-          }
-        }
-      });
-
-      // Render!
-      await renderAllStations();
-    }
   </script>
 </body>
 </html>
