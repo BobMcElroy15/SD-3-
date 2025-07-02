@@ -11,9 +11,11 @@
 
   <style>
     body { margin:0; padding:0; font-family:sans-serif; }
-    h1 { margin:10px; }
-    #map { height:60vh; }
-    #stationsTable { height:40vh; overflow-y:auto; }
+    #loginContainer { display:flex; height:100vh; align-items:center; justify-content:center; }
+    #loginBox { padding:20px; border:1px solid #ccc; border-radius:6px; background:#fafafa; }
+    #loginBox input { display:block; width:200px; margin:8px 0; padding:6px; }
+    #map { height:60vh; display:none; }
+    #stationsTable { height:40vh; overflow-y:auto; display:none; }
     #stationsTable table { width:100%; border-collapse:collapse; }
     th, td { border:1px solid #ccc; padding:6px; }
     th { background:#f5f5f5; }
@@ -21,53 +23,95 @@
     tr.highlight { background:#d0eaff !important; }
     input { width:100%; box-sizing:border-box; }
     button { margin:0 4px; }
-    /* hide Save/Cancel until Edit is pressed */
-    button.save, button.cancel { display: none; }
+    button.save, button.cancel { display:none; }
   </style>
 </head>
 <body>
 
-  <h1>Pump Stations Admin</h1>
-  <div id="map"></div>
+  <!-- Login UI -->
+  <div id="loginContainer">
+    <div id="loginBox">
+      <h2>Admin Login</h2>
+      <input type="email" id="email" placeholder="Email">
+      <input type="password" id="password" placeholder="Password">
+      <button id="loginBtn">Sign In</button>
+      <p id="loginError" style="color:red;"></p>
+    </div>
+  </div>
 
+  <!-- Once authenticated, these show: -->
+  <h1 id="header" style="margin:10px; display:none;">Pump Stations Admin</h1>
+  <div id="map"></div>
   <div id="stationsTable">
     <table>
       <thead>
         <tr>
-          <th>Code</th>
-          <th>Address</th>
-          <th>Lat</th>
-          <th>Lon</th>
-          <th>Actions</th>
+          <th>Code</th><th>Address</th><th>Lat</th><th>Lon</th><th>Actions</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
   </div>
 
-  <!-- Leaflet, Geocoder & Firebase SDKs -->
+  <!-- SDKs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
   <script>
-  (async function(){
-    // ─── Firebase init ────────────────────────────────────────────────
-    firebase.initializeApp({
-      apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
-      authDomain:        "sd3ps-map.firebaseapp.com",
-      projectId:         "sd3ps-map",
-      storageBucket:     "sd3ps-map.appspot.com",
-      messagingSenderId: "14976888367",
-      appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
-      measurementId:     "G-HHX1X8KFSF"
-    });
-    const analytics = firebase.analytics();
-    const db        = firebase.firestore();
+  // ─── Firebase init ────────────────────────────────────────────────
+  firebase.initializeApp({
+    apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
+    authDomain:        "sd3ps-map.firebaseapp.com",
+    projectId:         "sd3ps-map",
+    storageBucket:     "sd3ps-map.appspot.com",
+    messagingSenderId: "14976888367",
+    appId:             "1:14976888367:web:9ef05a76be1ca780d7e0da",
+    measurementId:     "G-HHX1X8KFSF"
+  });
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+  const analytics = firebase.analytics();
 
-    // ─── Map + Geocoder ────────────────────────────────────────────────
+  // ─── UI refs ──────────────────────────────────────────────────────
+  const loginContainer = document.getElementById('loginContainer');
+  const header         = document.getElementById('header');
+  const mapEl          = document.getElementById('map');
+  const tableContainer = document.getElementById('stationsTable');
+  const loginBtn       = document.getElementById('loginBtn');
+  const emailInput     = document.getElementById('email');
+  const passInput      = document.getElementById('password');
+  const loginError     = document.getElementById('loginError');
+
+  // ─── Simple email/password login ─────────────────────────────────
+  loginBtn.onclick = async () => {
+    const email = emailInput.value.trim();
+    const pass  = passInput.value;
+    loginError.textContent = '';
+    try {
+      await auth.signInWithEmailAndPassword(email, pass);
+    } catch(err) {
+      loginError.textContent = err.message;
+    }
+  };
+
+  // ─── After auth, initialize everything ────────────────────────────
+  auth.onAuthStateChanged(user => {
+    if (!user) return;
+    // hide login, show admin UI
+    loginContainer.style.display = 'none';
+    header.style.display = '';
+    mapEl.style.display = '';
+    tableContainer.style.display = '';
+    initAdmin();
+  });
+
+  // ─── Main admin init ──────────────────────────────────────────────
+  async function initAdmin(){
+    // Map + Geocoder
     const map = L.map('map').setView([40.730889, -73.284654], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap contributors'
@@ -76,18 +120,16 @@
       .on('markgeocode', e => map.setView(e.geocode.center, 17))
       .addTo(map);
 
-    // ─── Data holders ──────────────────────────────────────────────────
-    const markers = [], docs = [];
-    const tbody   = document.querySelector('#stationsTable tbody');
-    const tempDel = {}; // for undo-delete-note
+    const markers = [], docs = [], tempDel = {};
+    const tbody = document.querySelector('#stationsTable tbody');
 
-    // ─── Add one station row + marker ─────────────────────────────────
+    // build station row + marker
     async function addStation(doc, idx){
       const code = doc.id;
       let { address, lat, lon } = doc.data();
       docs[idx] = doc;
 
-      // build row
+      // row
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><input class="code"  value="${code}" disabled></td>
@@ -102,19 +144,18 @@
         </td>`;
       tbody.appendChild(tr);
 
-      // clicking row fires popup & highlights
+      // clicking row opens its popup & highlight
       tr.addEventListener('click', () => {
         markers[idx].fire('click');
         document.querySelectorAll('tr').forEach(r=>r.classList.remove('highlight'));
         tr.classList.add('highlight');
-        tr.scrollIntoView({ behavior:'smooth', block:'nearest' });
+        tr.scrollIntoView({behavior:'smooth',block:'nearest'});
       });
 
-      // create marker
+      // marker
       const m = L.marker([lat, lon]).addTo(map);
       markers[idx] = m;
-      m.on('click', async () => {
-        // build popup
+      m.on('click', async ()=>{
         const ns = await db.collection('notes').doc(code).get();
         const note = ns.exists ? ns.data().text : '';
         const popup = `
@@ -135,18 +176,17 @@
       });
     }
 
-    // ─── Load & render all stations ───────────────────────────────────
+    // load
     const snap = await db.collection('pumpStations').get();
     snap.docs.forEach((doc,i)=> addStation(doc,i));
 
-    // ─── Table Edit/Save/Cancel/Delete ────────────────────────────────
+    // table actions
     tbody.addEventListener('click', async e=>{
       const idx = +e.target.dataset.idx;
       if (isNaN(idx)) return;
       const tr   = tbody.children[idx];
       const code = tr.querySelector('.code').value;
 
-      // Edit → enable fields + show Save/Cancel
       if (e.target.matches('.edit')){
         ['addr','lat','lon'].forEach(c=>{
           tr.querySelector('.'+c).disabled = false;
@@ -155,13 +195,9 @@
         tr.querySelector('.save').style.display   = 'inline-block';
         tr.querySelector('.cancel').style.display = 'inline-block';
       }
-
-      // Cancel → reload to reset
       if (e.target.matches('.cancel')){
         location.reload();
       }
-
-      // Save → commit changes
       if (e.target.matches('.save')){
         const newAddress = tr.querySelector('.addr').value.trim();
         const newLat     = parseFloat(tr.querySelector('.lat').value);
@@ -172,8 +208,6 @@
         alert('Saved');
         location.reload();
       }
-
-      // Delete → remove doc
       if (e.target.matches('.del')){
         if (!confirm(`Delete ${code}?`)) return;
         await db.collection('pumpStations').doc(code).delete();
@@ -182,13 +216,12 @@
       }
     });
 
-    // ─── Popup note & adjust-pin handlers ─────────────────────────────
+    // popup note & pin adjust
     document.body.addEventListener('click', async e=>{
       const idx = +e.target.dataset.idx;
       if (isNaN(idx)) return;
       const code = docs[idx].id;
 
-      // Add/Edit note
       if (e.target.matches('.note-btn')){
         e.preventDefault();
         const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
@@ -199,8 +232,6 @@
           document.getElementById(`note-display-${idx}`).textContent=txt;
         }
       }
-
-      // Delete note
       if (e.target.matches('.del-note')){
         e.preventDefault();
         const snapN = await db.collection('notes').doc(code).get();
@@ -209,8 +240,6 @@
         document.getElementById(`note-display-${idx}`).textContent='';
         e.target.nextElementSibling.style.display='inline';
       }
-
-      // Undo note
       if (e.target.matches('.undo-note')){
         e.preventDefault();
         await db.collection('notes').doc(code)
@@ -219,8 +248,6 @@
         e.target.style.display='none';
         delete tempDel[code];
       }
-
-      // Adjust Pin
       if (e.target.matches('.adjust-pin')){
         e.preventDefault();
         const m = markers[idx];
@@ -237,8 +264,7 @@
         }
       }
     });
-
-  })();
+  }
   </script>
 </body>
 </html>
