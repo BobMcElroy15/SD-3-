@@ -11,7 +11,6 @@
       --primary-color: #0066cc;
       --light-primary: #e7f3ff;
       --danger-color: #dc3545;
-      --warning-color: #ffc107;
       --success-color: #28a745;
       --light-gray: #f8f9fa;
       --border-color: #dee2e6;
@@ -123,10 +122,11 @@
       gap: 0.5rem;
     }
     .station-actions button {
-      flex-grow: 1; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: 500;
+      flex-grow: 1; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: 500; color: white;
     }
-    .edit-info-btn { background-color: var(--warning-color); }
-    .delete-btn { background-color: var(--danger-color); color: white; }
+    /* ** CHANGED ** Edit button is now blue */
+    .edit-info-btn { background-color: var(--primary-color); }
+    .delete-btn { background-color: var(--danger-color); }
 
     /* Auth Screen */
     #auth-container {
@@ -227,7 +227,7 @@
     auth.onAuthStateChanged(user => {
       if (user) {
         authContainer.style.display = 'none';
-        appLayout.style.display = 'flex'; // Show the new app layout
+        appLayout.style.display = 'flex';
         initializeMap();
         getStations();
       } else {
@@ -289,6 +289,8 @@
                 listItem.classList.add('selected');
                 listItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
+            // ** CHANGED ** Zoom in closer when a pin is clicked on the map
+            map.flyTo(marker.getLatLng(), 18);
         });
 
         const li = document.createElement('li');
@@ -361,7 +363,8 @@
       li.classList.add('selected');
       const marker = markers[id];
       if (marker) {
-        map.flyTo(marker.getLatLng(), 16);
+        // ** CHANGED ** Zoom in closer when a list item is clicked
+        map.flyTo(marker.getLatLng(), 18);
         marker.openPopup();
       }
 
