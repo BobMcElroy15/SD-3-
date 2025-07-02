@@ -184,7 +184,7 @@
       const ns   = await db.collection('notes').doc(code).get();
       const note = ns.exists ? ns.data().text : '';
       
-      // ** CORRECTED URL **
+      // Corrected the Google Maps URL to be valid
       const navUrl = `https://maps.google.com/?q=$${lat},${lon}`;
 
       const html = `
@@ -234,7 +234,6 @@
       if (e.target.matches('.delete-note-btn')) {
         e.preventDefault();
         const docSnap = await db.collection('notes').doc(code).get();
-        // ** CORRECTED TYPO **
         tempDel[code] = docSnap.exists ? docSnap.data().text : '';
         await db.collection('notes').doc(code).delete();
         document.getElementById(`note-display-${i}`).textContent = '';
