@@ -35,7 +35,7 @@
     }
     
     #map-container {
-      height: 45vh; /* Map takes top 45% of the screen */
+      height: 60vh; /* ** CHANGED ** Map is now bigger on mobile */
       position: relative;
     }
     
@@ -95,6 +95,16 @@
     .note-text .no-note { color: #aaa; }
     .note-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .note-header span { font-weight: 500; font-size: 0.9rem; color: var(--muted-color); }
+    
+    /* ** CHANGED ** Streamlined Mobile List */
+    @media (max-width: 991px) {
+        #stationList .coords-line {
+            display: none; /* Hide coordinates on mobile */
+        }
+        #stationList li {
+            padding: 0.5rem 0.75rem; /* Make list items more compact */
+        }
+    }
 
     /* Icon Button Styles */
     .icon-actions { display: flex; gap: 0.25rem; }
@@ -146,7 +156,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <script>
-    // --- App Setup & Firebase Init (No changes) ---
+    // --- App Setup & Firebase Init ---
     const firebaseConfig = {
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -169,6 +179,8 @@
     let markers = {};
     let lastSearchResult = null;
     let originalPinPositions = {};
+
+    // --- Authentication Logic ---
     const authForm = document.getElementById('auth-form');
     const formTitle = document.getElementById('form-title');
     const emailInput = document.getElementById('emailInput');
@@ -214,8 +226,7 @@
         cancel: `<svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5,12,10.59,6.41,5,5,6.41,10.59,12,5,17.59,6.41,19,12,13.41,17.59,19,19,17.59,13.41,12,19,6.41Z"/></svg>`,
     };
     
-    // --- Main App Logic (Map and Stations) ---
-    // The rest of the JavaScript is unchanged.
+    // --- Main App Logic ---
     function initializeMap() {
         if (map) { map.invalidateSize(); return; }
         map = L.map('map').setView([40.730889, -73.284654], 12);
@@ -247,9 +258,7 @@
     }
     async function getStations() {
       stationList.innerHTML = '';
-      if (markers) {
-        Object.values(markers).forEach(marker => map.removeLayer(marker));
-      }
+      if (markers) { Object.values(markers).forEach(marker => map.removeLayer(marker)); }
       markers = {};
       const snapshot = await db.collection('pumpStations').orderBy('__name__').get();
       for (const doc of snapshot.docs) {
