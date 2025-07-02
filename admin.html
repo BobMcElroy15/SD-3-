@@ -7,68 +7,134 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <style>
-    body { font-family: sans-serif; margin: 0; background-color: #f4f4f4; }
-    .container { padding: 20px; }
-    h1, h2 { color: #333; }
-    #map { height: 400px; margin-bottom: 20px; border-radius: 5px; }
-    
-    /* Auth Container Styling */
-    #auth-container {
+    :root {
+      --primary-color: #0066cc;
+      --light-primary: #e7f3ff;
+      --danger-color: #dc3545;
+      --warning-color: #ffc107;
+      --success-color: #28a745;
+      --light-gray: #f8f9fa;
+      --border-color: #dee2e6;
+    }
+
+    /* Base & Layout */
+    body { 
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      margin: 0; 
+      background-color: var(--light-gray);
+      overflow: hidden; /* Prevent body scrolling */
+    }
+
+    #app-layout {
       display: flex;
-      justify-content: center;
-      align-items: center;
       height: 100vh;
-      text-align: center;
+    }
+
+    #side-panel {
+      width: 420px;
+      background-color: #ffffff;
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      z-index: 10;
+    }
+    
+    #map-container {
+      flex-grow: 1;
       position: relative;
-      z-index: 9999;
+    }
+    
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+
+    /* Header */
+    #panel-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    #panel-header h1 {
+      font-size: 1.25rem;
+      margin: 0;
+    }
+    #logoutBtn {
+      background: none;
+      border: 1px solid var(--danger-color);
+      color: var(--danger-color);
+      font-weight: 500;
+      border-radius: 5px;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s;
+    }
+    #logoutBtn:hover {
+      background-color: var(--danger-color);
+      color: white;
+    }
+
+    /* Scrollable Content Area */
+    #panel-content {
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    /* Add from Search Section */
+    #addFromSearch {
+        display: none; background: var(--light-primary); padding: 15px; border-radius: 8px; margin-bottom: 1rem;
+    }
+    #addFromSearch p { margin: 0 0 10px 0; font-weight: 500; }
+    #addFromSearch button {
+        background: var(--success-color); color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 1rem;
+    }
+
+    /* Station List */
+    #stationList { list-style-type: none; padding: 0; margin: 0; }
+    #stationList li {
+      background: #fff; margin-bottom: 0.75rem; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer; transition: box-shadow 0.2s, border-color 0.2s;
+    }
+    #stationList li:hover {
+      border-color: var(--primary-color);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    #stationList li.selected {
+      border-color: var(--primary-color);
+      background-color: var(--light-primary);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    #stationList .info-line {
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+    #stationList .coords-line {
+      font-size: 0.85rem;
+      color: #6c757d;
+    }
+    .station-actions {
+      margin-top: 0.75rem;
+      border-top: 1px solid var(--border-color);
+      padding-top: 0.75rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .station-actions button {
+      flex-grow: 1; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: 500;
+    }
+    .edit-info-btn { background-color: var(--warning-color); }
+    .delete-btn { background-color: var(--danger-color); color: white; }
+
+    /* Auth Screen */
+    #auth-container {
+      display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; background: #f8f9fa;
     }
     #auth-form {
       background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 320px;
     }
-    #auth-form input {
-      width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;
-    }
-    #auth-form button {
-      width: 100%; font-size: 16px; padding: 12px; cursor: pointer; background-color: #0066cc; color: white; border: none; border-radius: 5px; margin-top: 10px;
-    }
-    #auth-form a {
-        color: #0066cc; cursor: pointer; display: block; margin-top: 15px;
-    }
-    #auth-error {
-        color: red; margin-top: 10px; min-height: 20px;
-    }
-
-    /* Main Content Styling */
-    #main-content { display: none; }
-    #header { display: flex; justify-content: space-between; align-items: center; }
-    #header button {
-        background-color: #dc3545; color: white; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer;
-    }
-
-    #addFromSearch {
-        display: none; background: #e7f3ff; padding: 15px; border-radius: 5px; margin-top: 20px; border-left: 5px solid #0066cc;
-    }
-    #addFromSearch p { margin: 0 0 10px 0; }
-    #addFromSearch button {
-        background: #28a745; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;
-    }
-    
-    /* Popup button styling */
-    .popup-link { cursor: pointer; color: #007bff; text-decoration: underline; }
-    .popup-link:hover { color: #0056b3; }
-
-    #stationList { list-style-type: none; padding: 0; }
-    #stationList li {
-      background: #fff; margin-bottom: 10px; padding: 15px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-left: 5px solid transparent; transition: background-color 0.2s, border-left 0.2s;
-    }
-    #stationList li.selected {
-        background-color: #e7f3ff; border-left: 5px solid #0066cc;
-    }
-    .station-actions button {
-      margin-left: 10px; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer;
-    }
-    .edit-info-btn { background-color: #ffc107; }
-    .delete-btn { background-color: #dc3545; color: white; }
   </style>
 </head>
 <body>
@@ -76,30 +142,28 @@
   <div id="auth-container">
     <div id="auth-form">
       <h2 id="form-title">Admin Sign In</h2>
-      <input type="email" id="emailInput" placeholder="Email">
-      <input type="password" id="passwordInput" placeholder="Password">
-      <div id="auth-error"></div>
-      <button id="authBtn">Sign In</button>
-      <a id="switch-form">Need an account? Sign Up</a>
+      <input type="email" id="emailInput" placeholder="Email"><input type="password" id="passwordInput" placeholder="Password"><div id="auth-error"></div><button id="authBtn">Sign In</button><a id="switch-form">Need an account? Sign Up</a>
     </div>
   </div>
 
-  <div id="main-content">
-    <div id="map"></div>
-    <div class="container">
-      <div id="header">
+  <div id="app-layout" style="display: none;">
+    <aside id="side-panel">
+      <header id="panel-header">
         <h1>Pump Station Management</h1>
         <button id="logoutBtn">Sign Out</button>
+      </header>
+      <div id="panel-content">
+        <div id="addFromSearch">
+            <p><strong>Add new station:</strong> <span id="searchedAddress"></span></p>
+            <button id="addSearchedStationBtn">Add Searched Location</button>
+        </div>
+        <h2>Existing Stations</h2>
+        <ul id="stationList"></ul>
       </div>
-      
-      <div id="addFromSearch">
-          <p><strong>Add new station:</strong> <span id="searchedAddress"></span></p>
-          <button id="addSearchedStationBtn">Add Searched Location</button>
-      </div>
-
-      <h2>Existing Stations</h2>
-      <ul id="stationList"></ul>
-    </div>
+    </aside>
+    <main id="map-container">
+      <div id="map"></div>
+    </main>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -109,6 +173,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <script>
+    // Firebase Config & Init
     const firebaseConfig = {
       apiKey:            "AIzaSyBC4ytQPxzKZd1L47Gc5M4FoRYn44C5q9w",
       authDomain:        "sd3ps-map.firebaseapp.com",
@@ -121,8 +186,9 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
+    // DOM & State Refs
     const authContainer = document.getElementById('auth-container');
-    const mainContent = document.getElementById('main-content');
+    const appLayout = document.getElementById('app-layout');
     const logoutBtn = document.getElementById('logoutBtn');
     const stationList = document.getElementById('stationList');
     const addFromSearchUI = document.getElementById('addFromSearch');
@@ -134,6 +200,7 @@
     let lastSearchResult = null;
     let originalPinPositions = {};
 
+    // --- Authentication Logic ---
     const authForm = document.getElementById('auth-form');
     const formTitle = document.getElementById('form-title');
     const emailInput = document.getElementById('emailInput');
@@ -160,16 +227,17 @@
     auth.onAuthStateChanged(user => {
       if (user) {
         authContainer.style.display = 'none';
-        mainContent.style.display = 'block';
+        appLayout.style.display = 'flex'; // Show the new app layout
         initializeMap();
         getStations();
       } else {
         authContainer.style.display = 'flex';
-        mainContent.style.display = 'none';
+        appLayout.style.display = 'none';
         if(map) { map.remove(); map = null; }
       }
     });
 
+    // --- Main App Logic (Map and Stations) ---
     function initializeMap() {
         if (map) return;
         map = L.map('map').setView([40.730889, -73.284654], 12);
@@ -192,26 +260,24 @@
         }).addTo(map);
     }
 
-    // Function to generate popup content based on the state
     function getPopupContent(id, address, isMoving = false) {
         const moveLink = `<a class="popup-link move-pin-btn" data-id="${id}">Move Pin</a>`;
         const movingUI = `PIN UNLOCKED<br>
                           <a class="popup-link save-location-popup-btn" data-id="${id}">Save Location</a> | 
                           <a class="popup-link cancel-move-popup-btn" data-id="${id}">Cancel</a>`;
-        
         return `<strong>${id}</strong><br>${address}<hr style="margin: 4px 0;">${isMoving ? movingUI : moveLink}`;
     }
     
     async function getStations() {
       stationList.innerHTML = '';
-      Object.values(markers).forEach(marker => map.removeLayer(marker));
+      if (markers) {
+        Object.values(markers).forEach(marker => map.removeLayer(marker));
+      }
       markers = {};
       const snapshot = await db.collection('pumpStations').orderBy('__name__').get();
       snapshot.forEach(doc => {
         const station = doc.data();
         const code = doc.id;
-        
-        // **Pins are no longer draggable by default**
         const marker = L.marker([station.lat, station.lon], { draggable: false }).addTo(map);
         marker.bindPopup(getPopupContent(code, station.address));
         markers[code] = marker;
@@ -228,14 +294,16 @@
         const li = document.createElement('li');
         li.dataset.id = code;
         li.innerHTML = `
-          <span>
+          <div class="info-line">
             <strong>${code}</strong> - <span class="address-text">${station.address}</span>
-            (<span id="lat-span-${code}">${station.lat.toFixed(4)}</span>, <span id="lon-span-${code}">${station.lon.toFixed(4)}</span>)
-          </span>
-          <span class="station-actions">
+          </div>
+          <div class="coords-line">
+            Coords: <span id="lat-span-${code}">${station.lat.toFixed(5)}</span>, <span id="lon-span-${code}">${station.lon.toFixed(5)}</span>
+          </div>
+          <div class="station-actions">
             <button class="edit-info-btn" data-id="${code}">Edit Info</button>
             <button class="delete-btn" data-id="${code}">Delete</button>
-          </span>
+          </div>
         `;
         stationList.appendChild(li);
       });
@@ -252,21 +320,16 @@
         }
     });
 
-    // Delegated click handler for the whole document
     document.body.addEventListener('click', async (e) => {
         const target = e.target;
-        
-        // **Handle "Move Pin" click in popup**
         if (target.matches('.move-pin-btn')) {
             e.preventDefault();
             const id = target.dataset.id;
             const marker = markers[id];
-            originalPinPositions[id] = marker.getLatLng(); // Store original position
+            originalPinPositions[id] = marker.getLatLng();
             marker.dragging.enable();
             marker.getPopup().setContent(getPopupContent(id, marker.getPopup().getContent().split('<hr>')[0].split('<br>')[1], true));
         }
-
-        // **Handle "Save Location" click in popup**
         if (target.matches('.save-location-popup-btn')) {
             e.preventDefault();
             const id = target.dataset.id;
@@ -274,23 +337,20 @@
             const newPos = marker.getLatLng();
             marker.dragging.disable();
             await db.collection('pumpStations').doc(id).update({ lat: newPos.lat, lon: newPos.lng });
-            marker.getPopup().setContent(getPopupContent(id, marker.getPopup().getContent().split('<hr>')[0].split('<br>')[1], false));
+            marker.closePopup();
             alert('Location updated!');
-            await getStations(); // Refresh list with new coordinates
+            await getStations();
         }
-        
-        // **Handle "Cancel Move" click in popup**
         if (target.matches('.cancel-move-popup-btn')) {
             e.preventDefault();
             const id = target.dataset.id;
             const marker = markers[id];
             marker.dragging.disable();
-            marker.setLatLng(originalPinPositions[id], {animate: false}); // Revert to original position
+            marker.setLatLng(originalPinPositions[id]);
             delete originalPinPositions[id];
-            marker.getPopup().setContent(getPopupContent(id, marker.getPopup().getContent().split('<hr>')[0].split('<br>')[1], false));
+            marker.closePopup();
         }
     });
-
 
     stationList.addEventListener('click', async (e) => {
       const li = e.target.closest('li');
@@ -301,7 +361,7 @@
       li.classList.add('selected');
       const marker = markers[id];
       if (marker) {
-        map.setView(marker.getLatLng(), 16);
+        map.flyTo(marker.getLatLng(), 16);
         marker.openPopup();
       }
 
