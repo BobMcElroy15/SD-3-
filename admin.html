@@ -203,20 +203,98 @@
     
     // Load and Display Stations
     async function getStations() {
-      // (This function is the same as the previous version)
-      // ...
+      stationList.innerHTML = '';
+      Object.values(markers).forEach(marker => map.removeLayer(marker));
+      markers = {};
+
+      const snapshot = await db.collection('pumpStations').orderBy('__name__').get();
+      snapshot.forEach(doc => {
+        const station = doc.data();
+        const code = doc.id;
+        
+        // Add marker to map
+        const marker = L.marker([station.lat, station.lon], { draggable: true }).addTo(map);
+        marker.bindPopup(`<strong>${code}</strong><br/>${station.address}`);
+        markers[code] = marker;
+
+        // Handle marker dragging
+        marker.on('dragend', function(event) {
+          const position = event.target.getLatLng();
+          const saveButton = document.querySelector(`button.save-btn[data-id="${code}"]`);
+          if (saveButton) {
+            saveButton.style.display = 'inline-block';
+            document.getElementById(`lat-span-${code}`).textContent = position.lat.toFixed(6);
+            document.getElementById(`lon-span-${code}`).textContent = position.lng.toFixed(6);
+          }
+        });
+
+        // Add station to list
+        const li = document.createElement('li');
+        li.dataset.id = code;
+        li.innerHTML = `
+          <span>
+            <strong>${code}</strong> - ${station.address} 
+            (<span id="lat-span-${code}">${station.lat.toFixed(4)}</span>, <span id="lon-span-${code}">${station.lon.toFixed(4)}</span>)
+          </span>
+          <span class="station-actions">
+            <button class="save-btn" data-id="${code}" style="display:none;">Save Coords</button>
+            <button class="delete-btn" data-id="${code}">Delete</button>
+          </span>
+        `;
+        stationList.appendChild(li);
+      });
     }
 
     // Add New Station
     addBtn.addEventListener('click', async () => {
-      // (This function is the same as the previous version)
-      // ...
+      const code = codeInput.value.trim().toUpperCase();
+      const address = addressInput.value.trim();
+      const lat = parseFloat(latInput.value);
+      const lon = parseFloat(lonInput.value);
+
+      if (code && address && !isNaN(lat) && !isNaN(lon)) {
+        await db.collection('pumpStations').doc(code).set({ address, lat, lon });
+        codeInput.value = '';
+        addressInput.value = '';
+        latInput.value = '';
+        lonInput.value = '';
+        getStations();
+      } else {
+        alert('Please fill out all fields correctly.');
+      }
     });
 
     // Handle List Clicks (Select, Save, Delete)
     stationList.addEventListener('click', async (e) => {
-      // (This function is the same as the previous version)
-      // ...
+      const li = e.target.closest('li');
+      if (!li) return;
+
+      const id = li.dataset.id;
+      
+      // Select Item
+      document.querySelectorAll('#stationList li').forEach(item => item.classList.remove('selected'));
+      li.classList.add('selected');
+      const marker = markers[id];
+      if (marker) {
+        map.setView(marker.getLatLng(), 16);
+        marker.openPopup();
+      }
+
+      // Handle Buttons
+      if (e.target.classList.contains('delete-btn')) {
+        if (confirm(`Are you sure you want to delete station ${id}?`)) {
+          await db.collection('pumpStations').doc(id).delete();
+          getStations();
+        }
+      }
+
+      if (e.target.classList.contains('save-btn')) {
+        const newLat = parseFloat(document.getElementById(`lat-span-${id}`).textContent);
+        const newLon = parseFloat(document.getElementById(`lon-span-${id}`).textContent);
+        await db.collection('pumpStations').doc(id).update({ lat: newLat, lon: newLon });
+        e.target.style.display = 'none';
+        alert(`Station ${id} location updated!`);
+      }
     });
   </script>
 </body>
