@@ -26,7 +26,7 @@
       overflow: hidden;
     }
 
-    /* ** RESPONSIVE LAYOUT ** */
+    /* Responsive Layout */
     /* Mobile First (Default) */
     #app-layout {
       display: flex;
@@ -35,8 +35,9 @@
     }
     
     #map-container {
-      height: 70vh; /* ** CHANGED ** Map is now even bigger on mobile */
+      height: 70vh;
       position: relative;
+      background-color: var(--light-gray);
     }
     
     #side-panel {
@@ -47,7 +48,7 @@
       overflow: hidden;
     }
 
-    /* Desktop Layout (for screens wider than 991px) */
+    /* Desktop Layout */
     @media (min-width: 992px) {
       #app-layout {
         flex-direction: row;
@@ -89,32 +90,32 @@
     #stationList .info-line { font-weight: 500; margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: center; }
     #stationList .coords-line { font-size: 0.8rem; color: var(--muted-color); }
     
-    /* Note Section */
-    .note-section { background: var(--light-gray); padding: 0.5rem 0.75rem; margin-top: 0.5rem; border-radius: 5px; }
-    .note-text { font-style: italic; color: var(--muted-color); margin: 0; font-size: 0.9rem; word-wrap: break-word; } /* Removed bottom margin */
-    .note-text .no-note { color: #aaa; }
-    .note-header { display: flex; justify-content: space-between; align-items: center; } /* Removed bottom margin */
-    .note-header span { font-weight: 500; font-size: 0.9rem; color: var(--muted-color); }
-    
-    /* ** CHANGED ** Streamlined Mobile List */
+    /* Streamlined Mobile List */
     @media (max-width: 991px) {
         #stationList .coords-line {
-            display: none; /* Hide coordinates on mobile */
+            display: none;
         }
         #stationList .note-text {
-            display: none; /* Hide note text on mobile to save space */
+            display: none;
         }
         #stationList li {
-            padding: 0.5rem 0.75rem; /* Make list items more compact */
+            padding: 0.5rem 0.75rem;
         }
         .note-header {
             margin-bottom: 0;
         }
         .note-section {
             margin-top: 0.5rem;
-            padding: 0.4rem 0.75rem; /* Further tighten note section */
+            padding: 0.4rem 0.75rem;
         }
     }
+    
+    /* Note Section */
+    .note-section { background: var(--light-gray); padding: 0.5rem 0.75rem; margin-top: 0.5rem; border-radius: 5px; }
+    .note-text { font-style: italic; color: var(--muted-color); margin: 0; font-size: 0.9rem; word-wrap: break-word; }
+    .note-text .no-note { color: #aaa; }
+    .note-header { display: flex; justify-content: space-between; align-items: center; }
+    .note-header span { font-weight: 500; font-size: 0.9rem; color: var(--muted-color); }
 
     /* Icon Button Styles */
     .icon-actions { display: flex; gap: 0.25rem; }
@@ -127,7 +128,15 @@
 
     /* Auth Screen */
     #auth-container { display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; background: #f8f9fa; }
-    #auth-form { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 320px; }
+    #auth-form { 
+        background: white; 
+        padding: 30px; 
+        border-radius: 8px; 
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+        width: 320px;
+        position: relative;
+        z-index: 10000;
+    }
   </style>
 </head>
 <body>
@@ -189,6 +198,7 @@
     let markers = {};
     let lastSearchResult = null;
     let originalPinPositions = {};
+    let mapObserver; // ** NEW: For ResizeObserver **
 
     // --- Authentication Logic ---
     const authForm = document.getElementById('auth-form');
@@ -214,16 +224,17 @@
         authAction.catch(error => { authError.textContent = error.message; });
     });
     logoutBtn.addEventListener('click', () => auth.signOut());
+    
+    // ** REBUILT Auth State Change Logic **
     auth.onAuthStateChanged(user => {
       if (user) {
         authContainer.style.display = 'none';
         appLayout.style.display = 'flex';
-        initializeMap();
-        getStations();
+        initializeApp();
       } else {
         authContainer.style.display = 'flex';
         appLayout.style.display = 'none';
-        if(map) { map.remove(); map = null; }
+        destroyApp();
       }
     });
 
@@ -236,16 +247,25 @@
         cancel: `<svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5,12,10.59,6.41,5,5,6.41,10.59,12,5,17.59,6.41,19,12,13.41,17.59,19,19,17.59,13.41,12,19,6.41Z"/></svg>`,
     };
     
-    // --- Main App Logic ---
-    function initializeMap() {
-        if (map) { 
-            setTimeout(() => { map.invalidateSize() }, 0);
-            return; 
+    // --- ** REBUILT ** Main App Logic ---
+
+    function initializeApp() {
+        if (!map) {
+            initializeMap();
+            setupResizeObserver();
         }
+        getStations();
+    }
+    
+    function destroyApp() {
+        if (mapObserver) mapObserver.disconnect();
+        if (map) map.remove();
+        map = null;
+    }
+
+    // This function now ONLY creates the map instance.
+    function initializeMap() {
         map = L.map('map').setView([40.730889, -73.284654], 12);
-        setTimeout(() => {
-            map.invalidateSize();
-        }, 0);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
@@ -264,6 +284,18 @@
             addFromSearchUI.style.display = 'block';
         }).addTo(map);
     }
+    
+    // ** NEW ** The robust way to fix the map size.
+    function setupResizeObserver() {
+        const mapContainer = document.getElementById('map-container');
+        mapObserver = new ResizeObserver(() => {
+            if (map) {
+                map.invalidateSize();
+            }
+        });
+        mapObserver.observe(mapContainer);
+    }
+
     function getPopupContent(id, address, isMoving = false) {
         const moveLink = `<button title="Move Pin" class="icon-btn popup-link move-pin-btn" data-id="${id}">${icons.move}</button>`;
         const movingUI = `<div class="icon-actions">
