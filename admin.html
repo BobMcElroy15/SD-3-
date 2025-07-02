@@ -65,12 +65,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
   <script>
-    // BASIC ERROR BUBBLE, handles all async errors after load
+    // Global error catch
     window.addEventListener('error', function(e) {
-      const errBox = document.getElementById('fatalError');
-      if (errBox) errBox.textContent = 'JS Error: ' + e.message;
-      document.getElementById('loginContainer').style.display = '';
-      document.getElementById('adminUI').style.display = 'none';
+      showError('JS Error: ' + e.message);
+      showLogin();
     });
 
     // --- CONFIG ---
@@ -87,16 +85,31 @@
     const db   = firebase.firestore();
     const analytics = firebase.analytics();
 
-    // LOGIN
     const loginContainer = document.getElementById('loginContainer');
     const adminUI        = document.getElementById('adminUI');
     const emailInput     = document.getElementById('email');
     const passInput      = document.getElementById('password');
     const loginBtn       = document.getElementById('loginBtn');
     const loginError     = document.getElementById('loginError');
+    const fatalError     = document.getElementById('fatalError');
+
+    function showLogin() {
+      loginContainer.style.display = '';
+      adminUI.style.display = 'none';
+    }
+    function showAdmin() {
+      loginContainer.style.display = 'none';
+      adminUI.style.display = '';
+    }
+    function showError(msg) {
+      fatalError.textContent = msg;
+      loginError.textContent = "";
+      showLogin();
+    }
 
     loginBtn.onclick = async () => {
       loginError.textContent = '';
+      fatalError.textContent = '';
       try {
         await auth.signInWithEmailAndPassword(emailInput.value.trim(), passInput.value);
       } catch(err) {
@@ -104,26 +117,23 @@
       }
     };
 
-    // Make sure UI does NOT flicker out!
+    // Firebase auth state change logic
     auth.onAuthStateChanged(async user => {
       if (user) {
-        loginContainer.style.display = 'none';
-        adminUI.style.display = '';
+        showAdmin();
         try {
           await loadAdminUI();
         } catch (e) {
-          document.getElementById('fatalError').textContent = "Failed to load admin: " + e;
-          loginContainer.style.display = '';
-          adminUI.style.display = 'none';
+          showError("Admin load error: " + e);
         }
       } else {
-        loginContainer.style.display = '';
-        adminUI.style.display = 'none';
+        showLogin();
       }
     });
 
     // --- MAIN ADMIN UI ---
     async function loadAdminUI() {
+      // This is only called after a successful login!
       // Map setup
       const map = L.map('map').setView([40.730889, -73.284654], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
@@ -188,120 +198,4 @@
             <strong>${code}</strong><br>
             ${address}<br>
             <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank">Navigate</a>
-            | <a href="#" class="note-btn"   data-idx="${idx}">Add/Edit Note</a>
-            | <a href="#" class="del-note"   data-idx="${idx}">Delete Note</a>
-            | <a href="#" class="undo-note"  data-idx="${idx}" style="display:none">Undo</a>
-            | <a href="#" class="adjust-pin" data-idx="${idx}">Adjust Pin</a>
-            <br>
-            <div id="note-display-${idx}" style="font-style:italic;color:#555">
-              ${note}
-            </div>`;
-          map.once('moveend',()=>m.bindPopup(html).openPopup());
-          map.setView([lat,lon],17,{animate:true,duration:0.8});
-          highlightRow(idx);
-        });
-      }
-
-      // Highlight and scroll to row
-      function highlightRow(idx){
-        const rows = Array.from(tbody.children);
-        rows.forEach(r => r.classList.remove('highlight'));
-        if (rows[idx]) {
-          rows[idx].classList.add('highlight');
-          rows[idx].scrollIntoView({behavior:'smooth',block:'nearest'});
-        }
-      }
-
-      // --- Table events: Edit/Save/Cancel/Delete ---
-      tbody.onclick = async e=>{
-        const idx = +e.target.dataset.idx;
-        if (isNaN(idx)) return;
-        const tr = tbody.children[idx];
-        const code = tr.querySelector('.code').value;
-
-        if (e.target.matches('.edit')){
-          ['addr','lat','lon'].forEach(c=>{
-            tr.querySelector(`.${c}`).disabled=false;
-          });
-          tr.classList.add('editing');
-          tr.querySelector('.edit').style.display='none';
-          tr.querySelector('.save').style.display='inline-block';
-          tr.querySelector('.cancel').style.display='inline-block';
-        }
-        if (e.target.matches('.cancel')){
-          await renderAllStations();
-        }
-        if (e.target.matches('.save')){
-          const newAddress = tr.querySelector('.addr').value.trim();
-          const newLat     = parseFloat(tr.querySelector('.lat').value);
-          const newLon     = parseFloat(tr.querySelector('.lon').value);
-          await db.collection('pumpStations').doc(code)
-                  .update({address:newAddress,lat:newLat,lon:newLon});
-          alert('Saved');
-          await renderAllStations();
-        }
-        if (e.target.matches('.del')){
-          if (!confirm(`Delete ${code}?`)) return;
-          await db.collection('pumpStations').doc(code).delete();
-          alert('Deleted');
-          await renderAllStations();
-        }
-      };
-
-      // --- Popups: notes & pin adjust ---
-      document.body.addEventListener('click',async e=>{
-        const idx = +e.target.dataset.idx;
-        if (isNaN(idx)) return;
-        const code = docs[idx].id;
-
-        // Note
-        if (e.target.matches('.note-btn')){
-          e.preventDefault();
-          const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
-          const txt = prompt(`Note for ${code}:`,cur);
-          if (txt!==null){
-            await db.collection('notes').doc(code)
-                    .set({text:txt,updated:firebase.firestore.FieldValue.serverTimestamp()});
-            document.getElementById(`note-display-${idx}`).textContent=txt;
-          }
-        }
-        if (e.target.matches('.del-note')){
-          e.preventDefault();
-          const snapN = await db.collection('notes').doc(code).get();
-          tempDel[code]=snapN.exists?snapN.data().text:'';
-          await db.collection('notes').doc(code).delete();
-          document.getElementById(`note-display-${idx}`).textContent='';
-          e.target.nextElementSibling.style.display='inline';
-        }
-        if (e.target.matches('.undo-note')){
-          e.preventDefault();
-          await db.collection('notes').doc(code)
-                  .set({text:tempDel[code],updated:firebase.firestore.FieldValue.serverTimestamp()});
-          document.getElementById(`note-display-${idx}`).textContent=tempDel[code];
-          e.target.style.display='none';
-          delete tempDel[code];
-        }
-        // Adjust Pin
-        if (e.target.matches('.adjust-pin')){
-          e.preventDefault();
-          const m = markers[idx];
-          if (!m.dragging.enabled()){
-            m.dragging.enable();
-            e.target.textContent='Save Pin';
-          } else {
-            m.dragging.disable();
-            const {lat,lng}=m.getLatLng();
-            await db.collection('pumpStations').doc(code)
-                    .update({lat,lon:lng});
-            alert('Pin moved');
-            await renderAllStations();
-          }
-        }
-      });
-
-      // Render!
-      await renderAllStations();
-    }
-  </script>
-</body>
-</html>
+            | <a href
