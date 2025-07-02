@@ -20,14 +20,41 @@
       height: 100vh;
       text-align: center;
     }
-    #auth-container button {
-      font-size: 18px;
-      padding: 12px 24px;
+    #auth-form {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      width: 320px;
+    }
+    #auth-form input {
+      width: calc(100% - 22px);
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    #auth-form button {
+      width: 100%;
+      font-size: 16px;
+      padding: 12px;
       cursor: pointer;
       background-color: #0066cc;
       color: white;
       border: none;
       border-radius: 5px;
+      margin-top: 10px;
+    }
+    #auth-form a {
+        color: #0066cc;
+        cursor: pointer;
+        display: block;
+        margin-top: 15px;
+    }
+    #auth-error {
+        color: red;
+        margin-top: 10px;
+        min-height: 20px;
     }
 
     /* Main Content Styling */
@@ -93,16 +120,18 @@
 <body>
 
   <div id="auth-container">
-    <div>
-      <h1>Admin Panel</h1>
-      <p>Please sign in to manage pump stations.</p>
-      <button id="loginBtn">Sign In with Google</button>
+    <div id="auth-form">
+      <h2 id="form-title">Admin Sign In</h2>
+      <input type="email" id="emailInput" placeholder="Email">
+      <input type="password" id="passwordInput" placeholder="Password">
+      <div id="auth-error"></div>
+      <button id="authBtn">Sign In</button>
+      <a id="switch-form">Need an account? Sign Up</a>
     </div>
   </div>
 
   <div id="main-content">
     <div id="map"></div>
-
     <div class="container">
       <div id="header">
         <h1>Pump Station Management</h1>
@@ -145,13 +174,22 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-    const provider = new firebase.auth.GoogleAuthProvider();
 
     // DOM & Map Refs
     const authContainer = document.getElementById('auth-container');
     const mainContent = document.getElementById('main-content');
-    const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
+    
+    // Auth Form Refs
+    const authForm = document.getElementById('auth-form');
+    const formTitle = document.getElementById('form-title');
+    const emailInput = document.getElementById('emailInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const authBtn = document.getElementById('authBtn');
+    const switchFormLink = document.getElementById('switch-form');
+    const authError = document.getElementById('auth-error');
+    
+    // Rest of the App Refs
     const stationList = document.getElementById('stationList');
     const addBtn = document.getElementById('addBtn');
     const codeInput = document.getElementById('stationCode');
@@ -161,9 +199,37 @@
     
     let map;
     let markers = {};
+    let isSignUp = false;
 
-    // Auth Logic
-    loginBtn.addEventListener('click', () => auth.signInWithPopup(provider));
+    // --- Authentication Logic ---
+    switchFormLink.addEventListener('click', () => {
+        isSignUp = !isSignUp;
+        formTitle.textContent = isSignUp ? 'Create Account' : 'Admin Sign In';
+        authBtn.textContent = isSignUp ? 'Sign Up' : 'Sign In';
+        switchFormLink.textContent = isSignUp ? 'Have an account? Sign In' : 'Need an account? Sign Up';
+        authError.textContent = '';
+    });
+
+    authBtn.addEventListener('click', () => {
+        const email = emailInput.value;
+        const password = passwordInput.value;
+        authError.textContent = ''; // Clear previous errors
+
+        if (isSignUp) {
+            // Create a new account
+            auth.createUserWithEmailAndPassword(email, password)
+                .catch(error => {
+                    authError.textContent = error.message;
+                });
+        } else {
+            // Sign in an existing user
+            auth.signInWithEmailAndPassword(email, password)
+                .catch(error => {
+                    authError.textContent = error.message;
+                });
+        }
+    });
+
     logoutBtn.addEventListener('click', () => auth.signOut());
 
     auth.onAuthStateChanged(user => {
@@ -180,7 +246,9 @@
       }
     });
 
-    // Initialize Map and Geocoder
+    // --- Main App Logic (Map and Stations) ---
+    // (This part of the code is the same as the previous version)
+
     function initializeMap() {
         if (map) return; // Prevent re-initializing
         map = L.map('map').setView([40.730889, -73.284654], 12);
@@ -189,19 +257,17 @@
         }).addTo(map);
 
         const geocoder = L.Control.geocoder({
-            defaultMarkGeocode: false, // We'll handle the marker ourselves
+            defaultMarkGeocode: false,
             placeholder: 'Search for address...',
         }).on('markgeocode', function(e) {
             const { center, name } = e.geocode;
             map.fitBounds(e.geocode.bbox);
-            // Pre-fill the form with search result
-            addressInput.value = name.split(',').slice(0, 2).join(','); // Clean up address
+            addressInput.value = name.split(',').slice(0, 2).join(',');
             latInput.value = center.lat;
             lonInput.value = center.lng;
         }).addTo(map);
     }
     
-    // Load and Display Stations
     async function getStations() {
       stationList.innerHTML = '';
       Object.values(markers).forEach(marker => map.removeLayer(marker));
@@ -212,12 +278,10 @@
         const station = doc.data();
         const code = doc.id;
         
-        // Add marker to map
         const marker = L.marker([station.lat, station.lon], { draggable: true }).addTo(map);
         marker.bindPopup(`<strong>${code}</strong><br/>${station.address}`);
         markers[code] = marker;
 
-        // Handle marker dragging
         marker.on('dragend', function(event) {
           const position = event.target.getLatLng();
           const saveButton = document.querySelector(`button.save-btn[data-id="${code}"]`);
@@ -228,7 +292,6 @@
           }
         });
 
-        // Add station to list
         const li = document.createElement('li');
         li.dataset.id = code;
         li.innerHTML = `
@@ -245,7 +308,6 @@
       });
     }
 
-    // Add New Station
     addBtn.addEventListener('click', async () => {
       const code = codeInput.value.trim().toUpperCase();
       const address = addressInput.value.trim();
@@ -264,14 +326,12 @@
       }
     });
 
-    // Handle List Clicks (Select, Save, Delete)
     stationList.addEventListener('click', async (e) => {
       const li = e.target.closest('li');
       if (!li) return;
 
       const id = li.dataset.id;
       
-      // Select Item
       document.querySelectorAll('#stationList li').forEach(item => item.classList.remove('selected'));
       li.classList.add('selected');
       const marker = markers[id];
@@ -280,7 +340,6 @@
         marker.openPopup();
       }
 
-      // Handle Buttons
       if (e.target.classList.contains('delete-btn')) {
         if (confirm(`Are you sure you want to delete station ${id}?`)) {
           await db.collection('pumpStations').doc(id).delete();
