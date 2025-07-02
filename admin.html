@@ -9,34 +9,36 @@
   <style>
     body { margin:0; padding:0; font-family:sans-serif; }
     #loginContainer { height:100vh; display:flex; align-items:center; justify-content:center; }
-    #loginBox { padding:20px; border:1px solid #ccc; border-radius:6px; background:#fafafa; }
-    #loginBox input { display:block; width:220px; margin:8px 0; padding:6px; }
-    #loginBox button { width:100%; margin-top:8px; }
+    #loginBox { padding:24px 28px; border:1px solid #ccc; border-radius:7px; background:#fafbfc; }
+    #loginBox input { width:230px; margin:8px 0; padding:8px; }
+    #loginBox button { width:100%; margin-top:12px; padding:7px; }
+    #loginBox h2 { margin-top:0; }
+    #loginError { color: red; }
     #adminUI { display:none; }
-    h1 { margin:10px; }
-    #map { height:54vh; }
-    #stationsTable { height:46vh; overflow-y:auto; }
+    h1 { margin:10px 10px 4px 10px; }
+    #map { height:52vh; min-height:300px; }
+    #stationsTable { height:48vh; overflow-y:auto; }
     #stationsTable table { width:100%; border-collapse:collapse; }
-    th, td { border:1px solid #ccc; padding:6px; }
-    th { background:#f5f5f5; }
-    tr { cursor:pointer; transition: background 0.13s; }
-    tr.highlight, tr:focus, tr:active { background:#d0eaff !important; }
+    th, td { border:1px solid #ccc; padding:7px 5px; }
+    th { background:#f5f5f5; font-weight:600; }
+    tr { cursor:pointer; transition: background 0.15s; }
+    tr.highlight { background:#d0eaff !important; }
     tr.editing { background: #fffde5 !important; }
-    input.cell { width:100%; box-sizing:border-box; background:#fff; }
-    button { margin:0 4px; }
+    input.cell { width:98%; box-sizing:border-box; background:#fff; border-radius:3px; border:1px solid #e0e0e0; padding:5px; }
+    button { margin:0 2px; padding:5px 10px; border-radius:4px; border:1px solid #eee; background:#f5f5f5; cursor:pointer; }
     button.save, button.cancel { display:none; }
-    tr:hover { background:#e6f3ff; }
+    tr:hover:not(.editing):not(.highlight) { background:#e6f3ff; }
   </style>
 </head>
 <body>
-  <!-- LOGIN -->
+  <!-- LOGIN UI -->
   <div id="loginContainer">
     <div id="loginBox">
       <h2>Admin Login</h2>
       <input type="email" id="email" placeholder="Email" autocomplete="username">
       <input type="password" id="password" placeholder="Password" autocomplete="current-password">
       <button id="loginBtn">Sign In</button>
-      <p id="loginError" style="color:red;"></p>
+      <div id="loginError"></div>
     </div>
   </div>
   <!-- ADMIN UI -->
@@ -54,7 +56,7 @@
       </table>
     </div>
   </div>
-  <!-- SDKs -->
+  <!-- Firebase & Map SDKs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -76,7 +78,7 @@
     const db   = firebase.firestore();
     const analytics = firebase.analytics();
 
-    // --- LOGIN LOGIC ---
+    // LOGIN
     const loginContainer = document.getElementById('loginContainer');
     const adminUI        = document.getElementById('adminUI');
     const emailInput     = document.getElementById('email');
@@ -87,10 +89,7 @@
     loginBtn.onclick = async () => {
       loginError.textContent = '';
       try {
-        await auth.signInWithEmailAndPassword(
-          emailInput.value.trim(),
-          passInput.value
-        );
+        await auth.signInWithEmailAndPassword(emailInput.value.trim(), passInput.value);
       } catch(err) {
         loginError.textContent = err.message;
       }
@@ -100,70 +99,76 @@
       if (user) {
         loginContainer.style.display = 'none';
         adminUI.style.display = '';
-        if (!window._adminLoaded) {
-          window._adminLoaded = true;
-          try {
-            await initAdmin();
-          } catch (e) {
-            adminUI.innerHTML = "<div style='color:red'>Failed to load admin. " + e + "</div>";
-          }
+        try {
+          await loadAdminUI();
+        } catch (e) {
+          adminUI.innerHTML = "<div style='color:red'>Failed to load admin. " + e + "</div>";
         }
       } else {
         loginContainer.style.display = '';
         adminUI.style.display = 'none';
-        window._adminLoaded = false;
-        passInput.value = '';
       }
     });
 
-    // --- MAIN ADMIN UI LOGIC ---
-    async function initAdmin(){
+    // --- MAIN ADMIN UI ---
+    async function loadAdminUI() {
+      // Map setup
       const map = L.map('map').setView([40.730889, -73.284654], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
         attribution:'© OpenStreetMap contributors'
       }).addTo(map);
 
-      // Address search with suggestions
+      // Geocoder search
       L.Control.geocoder({ placeholder:'Search address…' })
         .on('markgeocode', e=>map.setView(e.geocode.center,17))
         .addTo(map);
 
-      const markers = [], docs = [], tempDel = {};
       const tbody = document.querySelector('#stationsTable tbody');
       tbody.innerHTML = '';
+      let markers = [], docs = [], tempDel = {};
 
-      // Add station (table row and pin)
-      async function addStation(doc,i){
+      // Add stations from Firestore
+      async function renderAllStations() {
+        tbody.innerHTML = '';
+        markers.forEach(m=>map.removeLayer(m));
+        markers = [];
+        docs = [];
+        const snap = await db.collection('pumpStations').get();
+        snap.docs.forEach((doc,i) => addStationRow(doc,i));
+      }
+
+      // Add one row + pin
+      function addStationRow(doc, idx) {
         const code = doc.id;
         let {address,lat,lon} = doc.data();
-        docs[i]=doc;
+        docs[idx]=doc;
 
         const tr = document.createElement('tr');
         tr.tabIndex = 0;
         tr.innerHTML=`
           <td><input class="code cell" value="${code}" disabled></td>
           <td><input class="addr cell" value="${address}" disabled></td>
-          <td><input class="lat  cell" type="number" step="any" value="${lat}" disabled></td>
-          <td><input class="lon  cell" type="number" step="any" value="${lon}" disabled></td>
+          <td><input class="lat cell"  type="number" step="any" value="${lat}" disabled></td>
+          <td><input class="lon cell"  type="number" step="any" value="${lon}" disabled></td>
           <td>
-            <button class="edit"   data-idx="${i}">Edit</button>
-            <button class="save"   data-idx="${i}">Save</button>
-            <button class="cancel" data-idx="${i}">Cancel</button>
-            <button class="del"    data-idx="${i}">Delete</button>
+            <button class="edit"   data-idx="${idx}">Edit</button>
+            <button class="save"   data-idx="${idx}" style="display:none">Save</button>
+            <button class="cancel" data-idx="${idx}" style="display:none">Cancel</button>
+            <button class="del"    data-idx="${idx}">Delete</button>
           </td>`;
         tbody.appendChild(tr);
 
-        // Always highlight row on click/field focus, and show popup on click (but not when clicking a button or input)
+        // Click row highlights and opens popup, except when editing
         tr.addEventListener('mousedown', ev => {
-          if (ev.target.tagName === "BUTTON") return;
-          selectRow(i);
-          markers[i].fire('click');
+          if (ev.target.tagName === "BUTTON" || ev.target.tagName === "INPUT") return;
+          highlightRow(idx);
+          markers[idx].fire('click');
         });
-        tr.addEventListener('focusin', () => selectRow(i));
+        tr.addEventListener('focusin', () => highlightRow(idx));
 
-        // Marker (pin)
+        // Marker
         const m = L.marker([lat,lon]).addTo(map);
-        markers[i]=m;
+        markers[idx]=m;
         m.on('click', async()=>{
           const noteSnap = await db.collection('notes').doc(code).get();
           const note = noteSnap.exists?noteSnap.data().text:'';
@@ -171,22 +176,22 @@
             <strong>${code}</strong><br>
             ${address}<br>
             <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank">Navigate</a>
-            | <a href="#" class="note-btn"   data-idx="${i}">Add/Edit Note</a>
-            | <a href="#" class="del-note"   data-idx="${i}">Delete Note</a>
-            | <a href="#" class="undo-note"  data-idx="${i}" style="display:none">Undo</a>
-            | <a href="#" class="adjust-pin" data-idx="${i}">Adjust Pin</a>
+            | <a href="#" class="note-btn"   data-idx="${idx}">Add/Edit Note</a>
+            | <a href="#" class="del-note"   data-idx="${idx}">Delete Note</a>
+            | <a href="#" class="undo-note"  data-idx="${idx}" style="display:none">Undo</a>
+            | <a href="#" class="adjust-pin" data-idx="${idx}">Adjust Pin</a>
             <br>
-            <div id="note-display-${i}" style="font-style:italic;color:#555">
+            <div id="note-display-${idx}" style="font-style:italic;color:#555">
               ${note}
             </div>`;
           map.once('moveend',()=>m.bindPopup(html).openPopup());
           map.setView([lat,lon],17,{animate:true,duration:0.8});
-          selectRow(i);
+          highlightRow(idx);
         });
       }
 
-      // Highlight/select row
-      function selectRow(idx){
+      // Highlight and scroll to row
+      function highlightRow(idx){
         const rows = Array.from(tbody.children);
         rows.forEach(r => r.classList.remove('highlight'));
         if (rows[idx]) {
@@ -195,12 +200,8 @@
         }
       }
 
-      // Load all stations
-      const snap = await db.collection('pumpStations').get();
-      snap.docs.forEach((doc,i)=>addStation(doc,i));
-
-      // Table buttons: Edit/Save/Cancel/Delete
-      tbody.addEventListener('click',async e=>{
+      // --- Table events: Edit/Save/Cancel/Delete ---
+      tbody.onclick = async e=>{
         const idx = +e.target.dataset.idx;
         if (isNaN(idx)) return;
         const tr = tbody.children[idx];
@@ -216,7 +217,7 @@
           tr.querySelector('.cancel').style.display='inline-block';
         }
         if (e.target.matches('.cancel')){
-          location.reload();
+          await renderAllStations();
         }
         if (e.target.matches('.save')){
           const newAddress = tr.querySelector('.addr').value.trim();
@@ -225,22 +226,23 @@
           await db.collection('pumpStations').doc(code)
                   .update({address:newAddress,lat:newLat,lon:newLon});
           alert('Saved');
-          location.reload();
+          await renderAllStations();
         }
         if (e.target.matches('.del')){
           if (!confirm(`Delete ${code}?`)) return;
           await db.collection('pumpStations').doc(code).delete();
           alert('Deleted');
-          location.reload();
+          await renderAllStations();
         }
-      });
+      };
 
-      // popup note & pin adjust
+      // --- Popups: notes & pin adjust ---
       document.body.addEventListener('click',async e=>{
         const idx = +e.target.dataset.idx;
         if (isNaN(idx)) return;
         const code = docs[idx].id;
 
+        // Note
         if (e.target.matches('.note-btn')){
           e.preventDefault();
           const cur = (await db.collection('notes').doc(code).get()).data()?.text||'';
@@ -267,6 +269,7 @@
           e.target.style.display='none';
           delete tempDel[code];
         }
+        // Adjust Pin
         if (e.target.matches('.adjust-pin')){
           e.preventDefault();
           const m = markers[idx];
@@ -279,10 +282,13 @@
             await db.collection('pumpStations').doc(code)
                     .update({lat,lon:lng});
             alert('Pin moved');
-            location.reload();
+            await renderAllStations();
           }
         }
       });
+
+      // Finally, render the first time!
+      await renderAllStations();
     }
   </script>
 </body>
