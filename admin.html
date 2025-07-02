@@ -26,7 +26,7 @@
       overflow: hidden;
     }
 
-    /* Responsive Layout */
+    /* ** RESPONSIVE LAYOUT ** */
     /* Mobile First (Default) */
     #app-layout {
       display: flex;
@@ -35,7 +35,7 @@
     }
     
     #map-container {
-      height: 70vh;
+      height: 70vh; /* ** CHANGED ** Map is now even bigger on mobile */
       position: relative;
     }
     
@@ -47,7 +47,7 @@
       overflow: hidden;
     }
 
-    /* Desktop Layout */
+    /* Desktop Layout (for screens wider than 991px) */
     @media (min-width: 992px) {
       #app-layout {
         flex-direction: row;
@@ -89,32 +89,32 @@
     #stationList .info-line { font-weight: 500; margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: center; }
     #stationList .coords-line { font-size: 0.8rem; color: var(--muted-color); }
     
-    /* Streamlined Mobile List */
+    /* Note Section */
+    .note-section { background: var(--light-gray); padding: 0.5rem 0.75rem; margin-top: 0.5rem; border-radius: 5px; }
+    .note-text { font-style: italic; color: var(--muted-color); margin: 0; font-size: 0.9rem; word-wrap: break-word; } /* Removed bottom margin */
+    .note-text .no-note { color: #aaa; }
+    .note-header { display: flex; justify-content: space-between; align-items: center; } /* Removed bottom margin */
+    .note-header span { font-weight: 500; font-size: 0.9rem; color: var(--muted-color); }
+    
+    /* ** CHANGED ** Streamlined Mobile List */
     @media (max-width: 991px) {
         #stationList .coords-line {
-            display: none;
+            display: none; /* Hide coordinates on mobile */
         }
         #stationList .note-text {
-            display: none;
+            display: none; /* Hide note text on mobile to save space */
         }
         #stationList li {
-            padding: 0.5rem 0.75rem;
+            padding: 0.5rem 0.75rem; /* Make list items more compact */
         }
         .note-header {
             margin-bottom: 0;
         }
         .note-section {
             margin-top: 0.5rem;
-            padding: 0.4rem 0.75rem;
+            padding: 0.4rem 0.75rem; /* Further tighten note section */
         }
     }
-    
-    /* Note Section */
-    .note-section { background: var(--light-gray); padding: 0.5rem 0.75rem; margin-top: 0.5rem; border-radius: 5px; }
-    .note-text { font-style: italic; color: var(--muted-color); margin: 0; font-size: 0.9rem; word-wrap: break-word; }
-    .note-text .no-note { color: #aaa; }
-    .note-header { display: flex; justify-content: space-between; align-items: center; }
-    .note-header span { font-weight: 500; font-size: 0.9rem; color: var(--muted-color); }
 
     /* Icon Button Styles */
     .icon-actions { display: flex; gap: 0.25rem; }
@@ -127,16 +127,7 @@
 
     /* Auth Screen */
     #auth-container { display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; background: #f8f9fa; }
-    #auth-form { 
-        background: white; 
-        padding: 30px; 
-        border-radius: 8px; 
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
-        width: 320px;
-        /* ** THE FIX IS HERE ** */
-        position: relative;
-        z-index: 10000;
-    }
+    #auth-form { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 320px; }
   </style>
 </head>
 <body>
