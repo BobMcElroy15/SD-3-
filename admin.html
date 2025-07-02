@@ -26,14 +26,39 @@
       overflow: hidden;
     }
 
+    /* ** REBUILT LAYOUT ** */
     #app-layout {
       display: flex;
+      flex-direction: column; /* Header on top, content below */
       height: 100%;
     }
     
+    #app-header {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      background-color: #ffffff;
+      z-index: 100;
+    }
+    #app-header h1 { font-size: 1.1rem; margin: 0; }
+    #logoutBtn { background: none; border: 1px solid var(--danger-color); color: var(--danger-color); font-weight: 500; border-radius: 5px; padding: 0.4rem 0.8rem; cursor: pointer; transition: background-color 0.2s, color 0.2s; }
+    #logoutBtn:hover { background-color: var(--danger-color); color: white; }
+    
+    #app-content {
+      display: flex;
+      flex-grow: 1;
+      min-height: 0; /* Important for flexbox scrolling */
+    }
+
     /* Mobile First (Default) */
-    #app-layout { flex-direction: column; }
-    #map-container { height: 60vh; flex-shrink: 0; }
+    #app-content { flex-direction: column; }
+    #map-container {
+      height: 45vh; /* ** CHANGED ** Smaller map on mobile */
+      flex-shrink: 0; 
+    }
     #side-panel {
       flex-grow: 1;
       display: flex;
@@ -41,29 +66,22 @@
       min-height: 0;
       border-top: 1px solid var(--border-color);
     }
-    #panel-content { flex-grow: 1; overflow-y: auto; padding: 0.75rem; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+    #panel-content { flex-grow: 1; overflow-y: auto; padding: 0.75rem; }
     
     /* Desktop Layout */
     @media (min-width: 992px) {
-      #app-layout { flex-direction: row; }
-      #map-container { height: 100%; flex-grow: 1; order: 2; }
+      #app-content { flex-direction: row; }
+      #map-container { height: auto; flex-grow: 1; order: 2; }
       #side-panel { width: 420px; flex-grow: 0; order: 1; border-top: none; border-right: 1px solid var(--border-color); }
     }
     
     #map { height: 100%; width: 100%; }
-
-    /* Header */
-    #app-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background-color: #ffffff; z-index: 100; }
-    #app-header h1 { font-size: 1.1rem; margin: 0; }
-    #logoutBtn { background: none; border: 1px solid var(--danger-color); color: var(--danger-color); font-weight: 500; border-radius: 5px; padding: 0.4rem 0.8rem; cursor: pointer; transition: background-color 0.2s, color 0.2s; }
-    #logoutBtn:hover { background-color: var(--danger-color); color: white; }
 
     /* Content Area */
     #panel-content h2 { font-size: 1rem; margin: 0 0 0.75rem 0.25rem; }
     #addFromSearch { display: none; background: var(--light-primary); padding: 15px; border-radius: 8px; margin-bottom: 1rem; }
     #addFromSearch button { background: var(--success-color); color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 1rem; }
     
-    /* ** NEW ** Dropdown styling */
     #stationSelect {
       width: 100%;
       padding: 0.75rem;
@@ -72,19 +90,11 @@
       border-radius: 8px;
       background-color: #fff;
       font-size: 1rem;
-      font-family: inherit;
-      -webkit-appearance: none;
-      appearance: none;
-      background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007CB2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22/%3E%3C/svg%3E');
-      background-repeat: no-repeat;
-      background-position: right .7em top 50%;
-      background-size: .65em auto;
     }
     
     /* Station List */
     #stationList { list-style-type: none; padding: 0; margin: 0; }
-    #stationList li { background: #fff; margin-bottom: 0.5rem; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer; transition: background-color 0.2s; }
-    #stationList li:hover { background-color: var(--light-gray); }
+    #stationList li { background: #fff; margin-bottom: 0.5rem; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer; transition: background-color 0.2s; }
     #stationList li.selected { border-color: var(--primary-color); background-color: var(--light-primary); }
     #stationList .info-line { font-size: 0.9rem; font-weight: 500; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
     
@@ -172,7 +182,7 @@
     const appLayout = document.getElementById('app-layout');
     const logoutBtn = document.getElementById('logoutBtn');
     const stationList = document.getElementById('stationList');
-    const stationSelect = document.getElementById('stationSelect'); // ** NEW **
+    const stationSelect = document.getElementById('stationSelect');
     const addFromSearchUI = document.getElementById('addFromSearch');
     const searchedAddressSpan = document.getElementById('searchedAddress');
     const addSearchedStationBtn = document.getElementById('addSearchedStationBtn');
@@ -248,31 +258,28 @@
     }
     async function getStations() {
       stationList.innerHTML = '';
-      stationSelect.innerHTML = '<option value="">Select a station...</option>'; // Clear and add default
+      stationSelect.innerHTML = '<option value="">Select a station...</option>';
       if (markers) { Object.values(markers).forEach(marker => map.removeLayer(marker)); }
       markers = {};
       const snapshot = await db.collection('pumpStations').orderBy('__name__').get();
-      snapshot.forEach(doc => {
+      for (const doc of snapshot.docs) {
         const station = doc.data();
         const code = doc.id;
-        const noteSnap = db.collection('notes').doc(code).get(); // Fetch note simultaneously
+        const noteSnap = db.collection('notes').doc(code).get();
         
-        // Populate dropdown
         const option = document.createElement('option');
         option.value = code;
         option.textContent = `${code} - ${station.address}`;
         stationSelect.appendChild(option);
 
-        // Create map marker
         const marker = L.marker([station.lat, station.lon], { draggable: false }).addTo(map);
         marker.bindPopup(getPopupContent(code, station.address));
         markers[code] = marker;
         marker.on('click', function() {
             const listItem = document.querySelector(`#stationList li[data-id="${code}"]`);
-            if (listItem) listItem.click(); // Reuse list click logic
+            if (listItem) listItem.click();
         });
 
-        // Create list item (note will be added after it's fetched)
         const li = document.createElement('li');
         li.dataset.id = code;
         li.innerHTML = `
@@ -290,12 +297,11 @@
         `;
         stationList.appendChild(li);
         
-        // Add note text once it's resolved
         noteSnap.then(noteDoc => {
             const noteText = noteDoc.exists && noteDoc.data().text ? noteDoc.data().text : '<span class="no-note">No note.</span>';
             li.querySelector('.note-text').innerHTML = noteText;
         });
-      });
+      }
     }
     addSearchedStationBtn.addEventListener('click', async () => {
         if (!lastSearchResult) return;
@@ -340,7 +346,7 @@
       if (!btn) {
         document.querySelectorAll('#stationList li').forEach(item => item.classList.remove('selected'));
         li.classList.add('selected');
-        stationSelect.value = id; // Sync dropdown
+        stationSelect.value = id;
         const marker = markers[id];
         if (marker) {
           map.flyTo(marker.getLatLng(), 18);
@@ -377,7 +383,6 @@
       }
     });
     
-    // ** NEW ** Event listener for the dropdown
     stationSelect.addEventListener('change', (e) => {
         const selectedId = e.target.value;
         if (selectedId) {
